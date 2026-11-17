@@ -1,0 +1,88 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --kite-bg: #ffffff;
+    --kite-surface: #f9f9f9;
+    --kite-surface-hover: #f5f7fa;
+    --kite-border: #eeeeee;
+    --kite-border-strong: #e0e0e0;
+    --kite-text: #444444;
+    --kite-muted: #9b9b9b;
+    --kite-orange: #ff5722;
+    --kite-blue: #4184f3;
+    --kite-green: #4caf50;
+    --kite-red: #df514c;
+  }
+
+  .dark {
+    --kite-bg: #121212;
+    --kite-surface: #181818;
+    --kite-surface-hover: #212121;
+    --kite-border: #282828;
+    --kite-border-strong: #333333;
+    --kite-text: #e0e0e0;
+    --kite-muted: #8c8c8c;
+  }
+
+  html {
+    font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .font-mono-num {
+    font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@keyframes flash-green {
+  0% {
+    background-color: rgba(76, 175, 80, 0.22);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes flash-red {
+  0% {
+    background-color: rgba(223, 81, 76, 0.22);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.tick-flash-up {
+  animation: flash-green 0.55s ease-out;
+}
+
+.tick-flash-down {
+  animation: flash-red 0.55s ease-out;
+}
+
+/* Clean subtle Kite-style scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(155, 155, 155, 0.35);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(155, 155, 155, 0.55);
+}

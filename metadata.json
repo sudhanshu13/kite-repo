@@ -1,0 +1,6 @@
+{
+  "name": "Kite Sandbox",
+  "description": "Zerodha Kite-inspired paper trading terminal with real-time WebSocket market data streaming, live technical analysis indicators, and simulated portfolio tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
