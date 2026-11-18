@@ -10,7 +10,7 @@ import type {
   OrderType,
   ProductType,
 } from '../../shared/types.ts';
-import { formatINR, formatPrice } from '../utils/format.ts';
+import { formatINR, formatPrice, getChangeColorClass } from '../utils/format.ts';
 
 interface OrderModalProps {
   instrument: Instrument;
@@ -36,11 +36,15 @@ export function OrderModal({
     instrument.exchange === 'NFO' ? 'NRML' : 'CNC',
   );
   const [orderType, setOrderType] = useState<OrderType>('MARKET');
-  const [quantity, setQuantity] = useState<number>(instrument.lotSize || 1);
+  const [quantityStr, setQuantityStr] = useState<string>(
+    String(instrument.lotSize || 1),
+  );
   const [price, setPrice] = useState<string>(quote.ltp.toFixed(2));
   const [triggerPrice, setTriggerPrice] = useState<string>(quote.ltp.toFixed(2));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const quantity = Math.max(0, Math.floor(Number(quantityStr) || 0));
 
   useEffect(() => {
     if (orderType === 'MARKET' || orderType === 'SL-M') {
@@ -52,6 +56,45 @@ export function OrderModal({
     orderType === 'MARKET' || orderType === 'SL-M'
       ? quote.ltp
       : Number(price) || 0;
+
+  const existingHolding = useMemo(
+    () => holdings.find((h) => h.token === instrument.token),
+    [holdings, instrument.token],
+  );
+
+  const holdingPreview = useMemo(() => {
+    if (product !== 'CNC' || quantity <= 0 || effectivePrice <= 0) return null;
+
+    if (side === 'BUY') {
+      const prevQty = existingHolding?.quantity ?? 0;
+      const prevInvested = existingHolding?.investedValue ?? 0;
+      const afterQty = prevQty + quantity;
+      const afterInvested = prevInvested + quantity * effectivePrice;
+      const afterAvg = afterInvested / afterQty;
+      const liveValue = afterQty * quote.ltp;
+      const livePnl = liveValue - afterInvested;
+      return {
+        type: 'BUY' as const,
+        afterQty,
+        afterAvg,
+        afterInvested,
+        livePnl,
+      };
+    }
+
+    const heldQty = existingHolding?.quantity ?? 0;
+    const heldAvg = existingHolding?.averagePrice ?? 0;
+    const heldInvested = existingHolding?.investedValue ?? 0;
+    const unitCost = heldQty > 0 ? heldInvested / heldQty : heldAvg;
+    const estRealized =
+      heldQty > 0 ? (effectivePrice - unitCost) * Math.min(quantity, heldQty) : 0;
+    return {
+      type: 'SELL' as const,
+      heldQty,
+      remainingQty: Math.max(0, heldQty - quantity),
+      estRealized,
+    };
+  }, [product, quantity, effectivePrice, side, existingHolding, quote.ltp]);
 
   const requiredMargin = useMemo(
     () =>
@@ -70,9 +113,18 @@ export function OrderModal({
   const accentBg = isBuy ? 'bg-[#4184F3]' : 'bg-[#FF5722]';
   const accentHover = isBuy ? 'hover:bg-[#3367D6]' : 'hover:bg-[#E64A19]';
 
+  const isRestingLimit =
+    orderType === 'LIMIT' &&
+    effectivePrice > 0 &&
+    ((isBuy && effectivePrice < quote.ltp) || (!isBuy && effectivePrice > quote.ltp));
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (quantity <= 0) {
+      setError('Quantity must be a positive whole number.');
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await onSubmitOrder({
@@ -81,7 +133,10 @@ export function OrderModal({
         product,
         orderType,
         quantity,
-        price: orderType === 'LIMIT' || orderType === 'SL' ? Number(price) : undefined,
+        price:
+          orderType === 'LIMIT' || orderType === 'CUSTOM' || orderType === 'SL'
+            ? Number(price)
+            : undefined,
         triggerPrice:
           orderType === 'SL' || orderType === 'SL-M'
             ? Number(triggerPrice)
@@ -104,7 +159,7 @@ export function OrderModal({
       aria-modal="true"
       aria-labelledby="order-modal-title"
     >
-      <div className="w-full max-w-[460px] bg-white dark:bg-[#181818] border border-[#E0E0E0] dark:border-[#333333] rounded shadow-2xl overflow-hidden">
+      <div className="w-full max-w-[480px] bg-white dark:bg-[#181818] border border-[#E0E0E0] dark:border-[#333333] rounded shadow-2xl overflow-hidden">
         {/* Kite Signature Coloured Header */}
         <div className={`${accentBg} text-white px-5 py-3.5 flex items-center justify-between`}>
           <div>
@@ -211,8 +266,13 @@ export function OrderModal({
                 min={instrument.lotSize || 1}
                 step={instrument.lotSize || 1}
                 required
-                value={quantity}
-                onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
+                value={quantityStr}
+                onChange={(e) => setQuantityStr(e.target.value)}
+                onBlur={() => {
+                  if (!quantityStr || Number(quantityStr) < 1) {
+                    setQuantityStr(String(instrument.lotSize || 1));
+                  }
+                }}
                 className="w-full px-2.5 py-2 text-sm tabular-nums bg-white dark:bg-[#121212] border border-[#E0E0E0] dark:border-[#333333] rounded focus:outline-none focus:border-[#4184F3]"
               />
             </div>
@@ -248,7 +308,7 @@ export function OrderModal({
                 type="number"
                 step="0.05"
                 min="0.05"
-                disabled={orderType === 'MARKET' || orderType === 'LIMIT'}
+                disabled={orderType === 'MARKET' || orderType === 'LIMIT' || orderType === 'CUSTOM'}
                 value={triggerPrice}
                 onChange={(e) => setTriggerPrice(e.target.value)}
                 className="w-full px-2.5 py-2 text-sm tabular-nums bg-white dark:bg-[#121212] border border-[#E0E0E0] dark:border-[#333333] rounded focus:outline-none focus:border-[#4184F3] disabled:opacity-50 disabled:bg-[#F5F5F5] dark:disabled:bg-[#141414]"
@@ -261,13 +321,13 @@ export function OrderModal({
             <span className="block text-[11px] font-medium text-[#9B9B9B] uppercase mb-1.5">
               Order Type
             </span>
-            <div className="grid grid-cols-4 gap-2">
-              {(['MARKET', 'LIMIT', 'SL', 'SL-M'] as OrderType[]).map((t) => (
+            <div className="grid grid-cols-5 gap-1.5">
+              {(['MARKET', 'LIMIT', 'CUSTOM', 'SL', 'SL-M'] as OrderType[]).map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => setOrderType(t)}
-                  className={`py-1.5 px-2 text-xs font-medium rounded border transition-colors cursor-pointer ${
+                  className={`py-1.5 px-1.5 text-[11px] font-medium rounded border transition-colors cursor-pointer ${
                     orderType === t
                       ? isBuy
                         ? 'border-[#4184F3] text-[#4184F3] bg-[#4184F3]/10'
@@ -279,7 +339,57 @@ export function OrderModal({
                 </button>
               ))}
             </div>
+            {orderType === 'CUSTOM' && (
+              <p className="text-[11px] text-[#666666] dark:text-[#A0A0A0] mt-1.5">
+                Instant fill at your entered price — adds directly to {product === 'CNC' ? 'Holdings' : 'Positions'} and tracks live P&amp;L as LTP moves.
+              </p>
+            )}
+            {isRestingLimit && (
+              <p className="text-[11px] text-[#9B9B9B] mt-1.5">
+                LIMIT waits until LTP hits ₹{formatPrice(effectivePrice)}.{' '}
+                <button
+                  type="button"
+                  onClick={() => setOrderType('CUSTOM')}
+                  className="text-[#4184F3] hover:underline font-medium cursor-pointer"
+                >
+                  Use CUSTOM to fill now
+                </button>
+              </p>
+            )}
           </div>
+
+          {/* CNC Holding Impact Preview */}
+          {holdingPreview && (
+            <div className="px-3 py-2 bg-[#F9F9F9] dark:bg-[#121212] border border-[#EEEEEE] dark:border-[#282828] rounded text-[11px] tabular-nums space-y-0.5">
+              {holdingPreview.type === 'BUY' ? (
+                <>
+                  <div className="flex items-center justify-between text-[#666666] dark:text-[#A0A0A0]">
+                    <span>
+                      Holding after buy: <strong className="text-[#444444] dark:text-[#E0E0E0]">{holdingPreview.afterQty} qty</strong> @ ₹{formatPrice(holdingPreview.afterAvg)} avg
+                    </span>
+                    <span>Inv. {formatINR(holdingPreview.afterInvested)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[#9B9B9B]">
+                    <span>Live P&amp;L at current LTP ₹{formatPrice(quote.ltp)}</span>
+                    <span className={`font-medium ${getChangeColorClass(holdingPreview.livePnl)}`}>
+                      {formatINR(holdingPreview.livePnl, true)}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-between text-[#666666] dark:text-[#A0A0A0]">
+                  <span>
+                    Held CNC: <strong className="text-[#444444] dark:text-[#E0E0E0]">{holdingPreview.heldQty} qty</strong> → Remaining {holdingPreview.remainingQty} qty
+                  </span>
+                  {holdingPreview.heldQty > 0 && (
+                    <span className={`font-medium ${getChangeColorClass(holdingPreview.estRealized)}`}>
+                      Est. P&amp;L {formatINR(holdingPreview.estRealized, true)}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Margin Strip & Submit */}
           <div className="pt-3 border-t border-[#EEEEEE] dark:border-[#282828] flex flex-col sm:flex-row sm:items-center justify-between gap-3">

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { MarketEngine } from './marketEngine.ts';
 import { TradingStore } from './store.ts';
 
 function createTempStore() {
@@ -89,3 +90,55 @@ test('Admin can create user with custom capital, adjust funds, suspend, and prev
     cleanup();
   }
 });
+
+test('CUSTOM order executes immediately at user-entered price and averages into CNC holdings', () => {
+  const { store, cleanup } = createTempStore();
+  try {
+    const market = new MarketEngine();
+    // Use AD0001 (starts clean with ₹25,00,000 cash and 0 holdings)
+    // 1) Buy 1 qty of TCS (token 2953217) at custom price ₹2395
+    const first = store.placeOrder(
+      'AD0001',
+      {
+        token: 2953217,
+        side: 'BUY',
+        product: 'CNC',
+        orderType: 'CUSTOM',
+        quantity: 1,
+        price: 2395,
+      },
+      market,
+    );
+    assert.equal(first.ok, true);
+    if (!first.ok) return;
+    assert.equal(first.order.status, 'COMPLETE');
+    assert.equal(first.order.averagePrice, 2395);
+
+    // 2) Buy 100 qty of TCS at custom price ₹1500
+    const second = store.placeOrder(
+      'AD0001',
+      {
+        token: 2953217,
+        side: 'BUY',
+        product: 'CNC',
+        orderType: 'CUSTOM',
+        quantity: 100,
+        price: 1500,
+      },
+      market,
+    );
+    assert.equal(second.ok, true);
+    if (!second.ok) return;
+    assert.equal(second.order.status, 'COMPLETE');
+    assert.equal(second.order.averagePrice, 1500);
+
+    const tcsHolding = second.portfolio.holdings.find((h) => h.token === 2953217);
+    assert.ok(tcsHolding);
+    assert.equal(tcsHolding.quantity, 101);
+    assert.equal(tcsHolding.investedValue, 152395);
+    assert.equal(tcsHolding.averagePrice, 1508.86);
+  } finally {
+    cleanup();
+  }
+});
+

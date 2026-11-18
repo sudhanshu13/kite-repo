@@ -653,14 +653,19 @@ export class TradingStore {
       updatedAt: nowIso,
     };
 
-    // Immediate execution check for MARKET or marketable LIMIT orders
+    // Immediate execution check for MARKET, CUSTOM (instant paper fill at entered price), or marketable LIMIT orders
     const isMarketableLimit =
       request.orderType === 'LIMIT' &&
       ((request.side === 'BUY' && baseOrder.price >= quote.ltp) ||
         (request.side === 'SELL' && baseOrder.price <= quote.ltp));
 
-    if (request.orderType === 'MARKET' || isMarketableLimit) {
-      const fillPrice = quote.ltp;
+    if (
+      request.orderType === 'MARKET' ||
+      request.orderType === 'CUSTOM' ||
+      isMarketableLimit
+    ) {
+      const fillPrice =
+        request.orderType === 'CUSTOM' ? baseOrder.price : quote.ltp;
       const updatedPortfolio = applyFilledOrderToPortfolio({
         portfolio: user.portfolio,
         order: baseOrder,

@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Activity, ArrowUpRight, Briefcase, Wallet } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Activity, Briefcase, PieChart } from 'lucide-react';
 import { computeHoldingMetrics, computePositionMetrics } from '../../shared/portfolioMath.ts';
 import type {
   Instrument,
@@ -29,6 +29,18 @@ interface DashboardViewProps {
   onOpenOrderModal: (token: number, side: OrderSide) => void;
 }
 
+const ALLOCATION_COLORS = [
+  '#4184F3',
+  '#4CAF50',
+  '#FF9800',
+  '#7E57C2',
+  '#00ACC1',
+  '#FF5722',
+  '#EC407A',
+];
+
+type AllocationMode = 'current' | 'investment';
+
 export function DashboardView({
   portfolio,
   instruments,
@@ -40,6 +52,8 @@ export function DashboardView({
   onSelectSymbolForTechnicals,
   onOpenOrderModal,
 }: DashboardViewProps) {
+  const [allocationMode, setAllocationMode] = useState<AllocationMode>('current');
+
   const instrumentMap = useMemo(() => {
     const m = new Map<number, Instrument>();
     for (const i of instruments) m.set(i.token, i);
@@ -50,170 +64,247 @@ export function DashboardView({
     let totalInvestment = 0;
     let currentValue = 0;
     let dayPnl = 0;
-    for (const h of portfolio.holdings) {
+    const rows = portfolio.holdings.map((h, idx) => {
       const m = computeHoldingMetrics(h, quotes[h.token]);
       totalInvestment += h.investedValue;
       currentValue += m.currentValue;
       dayPnl += m.dayPnl;
-    }
+      return {
+        token: h.token,
+        symbol: h.symbol,
+        investedValue: h.investedValue,
+        currentValue: m.currentValue,
+        color: ALLOCATION_COLORS[idx % ALLOCATION_COLORS.length],
+      };
+    });
     const totalPnl = currentValue - totalInvestment;
     const totalPnlPct = totalInvestment > 0 ? (totalPnl / totalInvestment) * 100 : 0;
-    return { totalInvestment, currentValue, totalPnl, totalPnlPct, dayPnl };
-  }, [portfolio.holdings, quotes]);
+
+    const totalBase = allocationMode === 'current' ? currentValue : totalInvestment;
+    const allocation = rows
+      .map((row) => {
+        const value = allocationMode === 'current' ? row.currentValue : row.investedValue;
+        const pct = totalBase > 0 ? (value / totalBase) * 100 : 0;
+        return { ...row, value, pct };
+      })
+      .sort((a, b) => b.value - a.value);
+
+    return { totalInvestment, currentValue, totalPnl, totalPnlPct, dayPnl, allocation };
+  }, [portfolio.holdings, quotes, allocationMode]);
 
   const positionsMtm = useMemo(() => {
     let total = 0;
+    let realized = 0;
     let openCount = 0;
     for (const p of portfolio.positions) {
       const m = computePositionMetrics(p, quotes[p.token]);
       total += m.mtmPnl;
+      realized += p.realizedPnl;
       if (m.isOpen) openCount++;
     }
-    return { total, openCount };
+    return { total, realized, openCount };
   }, [portfolio.positions, quotes]);
 
   const activeWatchTokens = portfolio.watchlists[activeWatchlistId] ?? [];
 
-  return (
-    <div className="p-5 lg:p-8 max-w-6xl space-y-8">
-      {/* Greeting */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-[#EEEEEE] dark:border-[#282828]">
-        <div>
-          <h1 className="text-[22px] font-normal text-[#444444] dark:text-[#E0E0E0] tracking-tight">
-            Hi, {portfolio.userName.split(' ')[0]}
-          </h1>
-        </div>
+  const signalCounts = useMemo(() => {
+    let buy = 0;
+    let sell = 0;
+    for (const token of activeWatchTokens) {
+      const s = signals[token];
+      if (s === 'Strong Buy' || s === 'Buy') buy++;
+      else if (s === 'Strong Sell' || s === 'Sell') sell++;
+    }
+    return { buy, sell };
+  }, [activeWatchTokens, signals]);
 
-        <div className="flex items-center gap-3 text-xs">
-          <button
-            type="button"
-            onClick={() => onNavigate('technicals')}
-            className="inline-flex items-center gap-1.5 text-[#4184F3] hover:underline font-normal cursor-pointer"
-          >
-            <Activity className="w-3.5 h-3.5" />
-            <span>Technicals</span>
-          </button>
-          <span className="text-[#E0E0E0] dark:text-[#333333]">·</span>
-          <button
-            type="button"
-            onClick={() => onNavigate('positions')}
-            className="inline-flex items-center gap-1.5 text-[#4184F3] hover:underline font-normal cursor-pointer"
-          >
-            <span>Positions ({positionsMtm.openCount})</span>
-          </button>
-          {isAdmin && (
-            <>
-              <span className="text-[#E0E0E0] dark:text-[#333333]">·</span>
-              <button
-                type="button"
-                onClick={() => onNavigate('funds')}
-                className="inline-flex items-center gap-1.5 text-[#4184F3] hover:underline font-normal cursor-pointer"
-              >
-                <span>Funds &amp; API</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </button>
-              <span className="text-[#E0E0E0] dark:text-[#333333]">·</span>
-              <button
-                type="button"
-                onClick={() => onNavigate('admin')}
-                className="inline-flex items-center gap-1.5 text-[#FF5722] hover:underline font-medium cursor-pointer"
-              >
-                <span>Admin</span>
-              </button>
-            </>
-          )}
-        </div>
+  return (
+    <div className="p-5 lg:p-9 max-w-[1100px] space-y-8">
+      {/* Greeting Header — Clean Kite Style */}
+      <div className="pb-4 border-b border-[#EEEEEE] dark:border-[#282828]">
+        <h1 className="text-[24px] font-normal text-[#444444] dark:text-[#E0E0E0] tracking-tight">
+          Hi, {portfolio.userName.split(' ')[0]}
+        </h1>
       </div>
 
-      {/* Equity Margin & Holdings Summary — Kite Signature 2-Column Open Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-        {/* Equity Margin */}
-        <section aria-labelledby="dash-equity-heading" className="space-y-4">
-          <div className="flex items-center gap-2 text-[15px] font-normal text-[#444444] dark:text-[#E0E0E0]">
-            <Wallet className="w-4 h-4 text-[#9B9B9B]" />
-            <h2 id="dash-equity-heading">Equity</h2>
+      {/* Row 1: Equity & Positions (Open 2-Column Kite Overview) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pb-8 border-b border-[#EEEEEE] dark:border-[#282828]">
+        {/* Left: Equity */}
+        <section aria-labelledby="dash-equity-heading" className="space-y-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-[15px] font-normal text-[#444444] dark:text-[#E0E0E0]">
+              <PieChart className="w-4 h-4 text-[#9B9B9B]" />
+              <h2 id="dash-equity-heading">Equity</h2>
+            </div>
+            {isAdmin && (
+              <div className="flex items-center gap-3 text-xs">
+                <button
+                  type="button"
+                  onClick={() => onNavigate('funds')}
+                  className="text-[#4184F3] hover:underline cursor-pointer"
+                >
+                  Funds &amp; API
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('admin')}
+                  className="text-[#FF5722] hover:underline font-medium cursor-pointer"
+                >
+                  Admin
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="flex items-start gap-8 pt-1">
-            <div>
-              <div className="text-[32px] leading-tight font-light tabular-nums text-[#444444] dark:text-[#E0E0E0]">
+          <div className="flex items-start gap-8">
+            <div className="min-w-[140px]">
+              <div className="text-[36px] leading-[1.1] font-light tabular-nums text-[#444444] dark:text-[#E0E0E0]">
                 {formatINR(portfolio.availableCash)}
               </div>
-              <div className="text-xs text-[#9B9B9B] mt-1">Margin available</div>
+              <div className="text-xs text-[#9B9B9B] mt-2">Margin available</div>
             </div>
 
-            <div className="space-y-2 text-xs border-l border-[#EEEEEE] dark:border-[#282828] pl-6">
-              <div className="flex items-center justify-between gap-6">
+            <div className="space-y-2 text-xs border-l border-[#EEEEEE] dark:border-[#282828] pl-7 flex-1">
+              <div className="flex items-center justify-between gap-4">
                 <span className="text-[#9B9B9B]">Margins used</span>
                 <span className="tabular-nums font-normal text-[#444444] dark:text-[#E0E0E0]">
                   {formatINR(portfolio.usedMargin)}
                 </span>
               </div>
-              <div className="flex items-center justify-between gap-6">
+              <div className="flex items-center justify-between gap-4">
                 <span className="text-[#9B9B9B]">Opening balance</span>
                 <span className="tabular-nums font-normal text-[#444444] dark:text-[#E0E0E0]">
                   {formatINR(portfolio.openingBalance)}
                 </span>
               </div>
-              <div className="flex items-center justify-between gap-6">
-                <span className="text-[#9B9B9B]">
-                  Positions M2M ({positionsMtm.openCount})
-                </span>
-                <span
-                  className={`tabular-nums font-medium ${getChangeColorClass(positionsMtm.total)}`}
+              <div className="pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => onNavigate('technicals')}
+                  className="text-[#4184F3] hover:underline cursor-pointer"
                 >
-                  {formatINR(positionsMtm.total, true)}
-                </span>
+                  View technicals
+                </button>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Holdings Summary */}
-        <section aria-labelledby="dash-holdings-heading" className="space-y-4">
+        {/* Right: Positions & Day M2M */}
+        <section aria-labelledby="dash-m2m-heading" className="space-y-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-[15px] font-normal text-[#444444] dark:text-[#E0E0E0]">
-              <Briefcase className="w-4 h-4 text-[#9B9B9B]" />
-              <h2 id="dash-holdings-heading">
-                Holdings ({portfolio.holdings.length})
-              </h2>
+              <Activity className="w-4 h-4 text-[#9B9B9B]" />
+              <h2 id="dash-m2m-heading">Positions ({portfolio.positions.length})</h2>
             </div>
             <button
               type="button"
-              onClick={() => onNavigate('holdings')}
+              onClick={() => onNavigate('positions')}
               className="text-xs text-[#4184F3] hover:underline cursor-pointer"
             >
-              View all
+              Manage positions
             </button>
           </div>
 
-          <div className="flex items-start gap-8 pt-1">
-            <div>
+          <div className="flex items-start gap-8">
+            <div className="min-w-[140px]">
               <div
-                className={`text-[32px] leading-tight font-light tabular-nums ${getChangeColorClass(holdingsSummary.totalPnl)}`}
+                className={`text-[36px] leading-[1.1] font-light tabular-nums ${
+                  portfolio.positions.length === 0
+                    ? 'text-[#444444] dark:text-[#E0E0E0]'
+                    : getChangeColorClass(positionsMtm.total)
+                }`}
               >
-                {formatINR(holdingsSummary.totalPnl, true)}
+                {formatINR(positionsMtm.total, portfolio.positions.length > 0)}
               </div>
-              <div className="text-xs text-[#9B9B9B] mt-1 tabular-nums">
-                P&amp;L ({holdingsSummary.totalPnlPct >= 0 ? '+' : ''}
-                {holdingsSummary.totalPnlPct.toFixed(2)}%)
-              </div>
+              <div className="text-xs text-[#9B9B9B] mt-2">Day&apos;s M2M</div>
             </div>
 
-            <div className="space-y-2 text-xs border-l border-[#EEEEEE] dark:border-[#282828] pl-6">
-              <div className="flex items-center justify-between gap-6">
+            <div className="space-y-2 text-xs border-l border-[#EEEEEE] dark:border-[#282828] pl-7 flex-1">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-[#9B9B9B]">Open positions</span>
+                <span className="tabular-nums font-normal text-[#444444] dark:text-[#E0E0E0]">
+                  {positionsMtm.openCount}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-[#9B9B9B]">Realized P&amp;L</span>
+                <span
+                  className={`tabular-nums font-normal ${getChangeColorClass(positionsMtm.realized)}`}
+                >
+                  {formatINR(positionsMtm.realized, positionsMtm.realized !== 0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-[#9B9B9B]">Watchlist signals</span>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('technicals')}
+                  className="tabular-nums text-[#4184F3] hover:underline cursor-pointer"
+                >
+                  {signalCounts.buy} Buy · {signalCounts.sell} Sell
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* Row 2: Signature Kite Full-Width Holdings Section + Stacked Allocation Bar */}
+      <section
+        aria-labelledby="dash-holdings-heading"
+        className="space-y-5 pb-8 border-b border-[#EEEEEE] dark:border-[#282828]"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-[15px] font-normal text-[#444444] dark:text-[#E0E0E0]">
+            <Briefcase className="w-4 h-4 text-[#9B9B9B]" />
+            <h2 id="dash-holdings-heading">
+              Holdings ({portfolio.holdings.length})
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => onNavigate('holdings')}
+            className="text-xs text-[#4184F3] hover:underline cursor-pointer"
+          >
+            View all
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Holdings P&L + Breakdown */}
+          <div className="lg:col-span-5 flex items-start gap-8">
+            <div className="min-w-[140px]">
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span
+                  className={`text-[36px] leading-[1.1] font-light tabular-nums ${getChangeColorClass(holdingsSummary.totalPnl)}`}
+                >
+                  {formatINR(holdingsSummary.totalPnl, true)}
+                </span>
+                <span
+                  className={`text-xs font-normal tabular-nums ${getChangeColorClass(holdingsSummary.totalPnl)}`}
+                >
+                  {holdingsSummary.totalPnlPct >= 0 ? '+' : ''}
+                  {holdingsSummary.totalPnlPct.toFixed(2)}%
+                </span>
+              </div>
+              <div className="text-xs text-[#9B9B9B] mt-2">P&amp;L</div>
+            </div>
+
+            <div className="space-y-2 text-xs border-l border-[#EEEEEE] dark:border-[#282828] pl-7 flex-1">
+              <div className="flex items-center justify-between gap-4">
                 <span className="text-[#9B9B9B]">Current value</span>
                 <span className="tabular-nums font-normal text-[#444444] dark:text-[#E0E0E0]">
                   {formatINR(holdingsSummary.currentValue)}
                 </span>
               </div>
-              <div className="flex items-center justify-between gap-6">
+              <div className="flex items-center justify-between gap-4">
                 <span className="text-[#9B9B9B]">Investment</span>
                 <span className="tabular-nums font-normal text-[#444444] dark:text-[#E0E0E0]">
                   {formatINR(holdingsSummary.totalInvestment)}
                 </span>
               </div>
-              <div className="flex items-center justify-between gap-6">
+              <div className="flex items-center justify-between gap-4">
                 <span className="text-[#9B9B9B]">Day&apos;s P&amp;L</span>
                 <span
                   className={`tabular-nums font-medium ${getChangeColorClass(holdingsSummary.dayPnl)}`}
@@ -223,22 +314,110 @@ export function DashboardView({
               </div>
             </div>
           </div>
-        </section>
-      </div>
+
+          {/* Horizontal Stacked Allocation Bar (Portfolio Distribution, Not a Price Chart) */}
+          <div className="lg:col-span-7 space-y-3">
+            {holdingsSummary.allocation.length === 0 ? (
+              <div className="text-xs text-[#9B9B9B] py-4">
+                No CNC equity holdings yet. Buy stocks via CNC from the Marketwatch to build your portfolio.
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-[#9B9B9B] tabular-nums">
+                    Portfolio weight ·{' '}
+                    {formatINR(
+                      allocationMode === 'current'
+                        ? holdingsSummary.currentValue
+                        : holdingsSummary.totalInvestment,
+                    )}
+                  </span>
+
+                  <div
+                    role="group"
+                    aria-label="Allocation valuation mode"
+                    className="inline-flex border border-[#E5E5E5] dark:border-[#333333] rounded overflow-hidden text-[11px]"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setAllocationMode('current')}
+                      className={`px-2.5 py-1 transition-colors cursor-pointer ${
+                        allocationMode === 'current'
+                          ? 'bg-[#F5F7FA] dark:bg-[#242424] text-[#4184F3] font-medium'
+                          : 'text-[#666666] dark:text-[#A0A0A0] hover:bg-[#FAFAFA] dark:hover:bg-[#1E1E1E]'
+                      }`}
+                    >
+                      Current value
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAllocationMode('investment')}
+                      className={`px-2.5 py-1 border-l border-[#E5E5E5] dark:border-[#333333] transition-colors cursor-pointer ${
+                        allocationMode === 'investment'
+                          ? 'bg-[#F5F7FA] dark:bg-[#242424] text-[#4184F3] font-medium'
+                          : 'text-[#666666] dark:text-[#A0A0A0] hover:bg-[#FAFAFA] dark:hover:bg-[#1E1E1E]'
+                      }`}
+                    >
+                      Investment value
+                    </button>
+                  </div>
+                </div>
+
+                {/* Flat Proportional Stacked Bar */}
+                <div
+                  className="h-7 w-full flex overflow-hidden rounded-[2px] bg-[#F4F4F4] dark:bg-[#222222]"
+                  role="img"
+                  aria-label="Holdings allocation breakdown bar"
+                >
+                  {holdingsSummary.allocation.map((item) => (
+                    <div
+                      key={item.token}
+                      style={{
+                        width: `${Math.max(item.pct, 0)}%`,
+                        backgroundColor: item.color,
+                      }}
+                      title={`${item.symbol}: ${item.pct.toFixed(1)}% (${formatINR(item.value)})`}
+                      className="h-full border-r border-white/60 dark:border-[#121212]/60 last:border-r-0 transition-[width] duration-300"
+                    />
+                  ))}
+                </div>
+
+                {/* Unboxed Symbol Weight Breakdown */}
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[11px]">
+                  {holdingsSummary.allocation.map((item) => (
+                    <button
+                      key={item.token}
+                      type="button"
+                      onClick={() => onSelectSymbolForTechnicals(item.token)}
+                      className="inline-flex items-center gap-1.5 text-[#444444] dark:text-[#CCCCCC] hover:text-[#4184F3] cursor-pointer"
+                    >
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="font-medium">{item.symbol}</span>
+                      <span className="tabular-nums text-[#9B9B9B]">
+                        {item.pct.toFixed(1)}%
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </section>
 
       {/* Active Positions Snapshot */}
       {portfolio.positions.length > 0 && (
-        <section
-          aria-labelledby="dash-positions-heading"
-          className="pt-5 border-t border-[#EEEEEE] dark:border-[#282828]"
-        >
-          <div className="flex items-center justify-between mb-3">
+        <section aria-labelledby="dash-positions-heading" className="space-y-3">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <h2
                 id="dash-positions-heading"
                 className="text-[15px] font-normal text-[#444444] dark:text-[#E0E0E0]"
               >
-                Positions ({portfolio.positions.length})
+                Open Positions ({portfolio.positions.length})
               </h2>
               <span
                 className={`text-xs font-medium tabular-nums ${getChangeColorClass(positionsMtm.total)}`}
@@ -325,17 +504,15 @@ export function DashboardView({
         </section>
       )}
 
-      {/* Watchlist Real-Time Price & Technical Pulse Table (No Charts) */}
-      <section aria-labelledby="dash-pulse-heading" className="pt-5 border-t border-[#EEEEEE] dark:border-[#282828]">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2
-              id="dash-pulse-heading"
-              className="text-[15px] font-normal text-[#444444] dark:text-[#E0E0E0]"
-            >
-              Watchlist {activeWatchlistId} · Live Quotes &amp; Technicals
-            </h2>
-          </div>
+      {/* Watchlist Real-Time Price & Technical Pulse Table (No Price Charts) */}
+      <section aria-labelledby="dash-pulse-heading" className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2
+            id="dash-pulse-heading"
+            className="text-[15px] font-normal text-[#444444] dark:text-[#E0E0E0]"
+          >
+            Watchlist {activeWatchlistId} · Live Quotes &amp; Technicals
+          </h2>
           <span className="text-xs tabular-nums text-[#9B9B9B]">
             {activeWatchTokens.length} instruments
           </span>
@@ -439,3 +616,4 @@ export function DashboardView({
     </div>
   );
 }
+

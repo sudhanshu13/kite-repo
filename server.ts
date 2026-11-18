@@ -12,7 +12,7 @@ import { INSTRUMENT_MAP } from './server/instruments.ts';
 import { MarketEngine } from './server/marketEngine.ts';
 import { TradingStore } from './server/store.ts';
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 const COOKIE_NAME = 'kite_session';
 
 function parseCookies(cookieHeader?: string): Record<string, string> {

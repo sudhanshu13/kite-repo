@@ -20,11 +20,21 @@ import { OrderModal } from './components/OrderModal.tsx';
 import { OrdersView } from './components/OrdersView.tsx';
 import { PositionsView } from './components/PositionsView.tsx';
 import { TechnicalsView } from './components/TechnicalsView.tsx';
+import { TerminalView, type WorkspaceConfig } from './components/TerminalView.tsx';
 import { TopBar, type NavTab } from './components/TopBar.tsx';
 import { apiFetch, getAuthToken, setAuthToken } from './utils/api.ts';
 
 const NIFTY_TOKEN = 256265;
 const SENSEX_TOKEN = 265;
+
+const DEFAULT_WORKSPACE: WorkspaceConfig = {
+  id: 'default',
+  name: 'Default',
+  showDepth: true,
+  showWatchlist: true,
+  showPositions: true,
+  showBlotter: true,
+};
 
 interface ToastMessage {
   id: string;
@@ -51,6 +61,9 @@ export default function App() {
   const [wsConnected, setWsConnected] = useState(false);
 
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+  const [terminalMode, setTerminalMode] = useState(false);
+  const [workspaces, setWorkspaces] = useState<WorkspaceConfig[]>([DEFAULT_WORKSPACE]);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>('default');
   const [mobilePane, setMobilePane] = useState<'watchlist' | 'workspace'>('watchlist');
   const [activeWatchlistId, setActiveWatchlistId] = useState<string>('1');
   const [selectedToken, setSelectedToken] = useState<number>(738561);
@@ -127,6 +140,45 @@ export default function App() {
       active = false;
     };
   }, []);
+
+  // Load saved workspaces per user
+  useEffect(() => {
+    if (!user) return;
+    try {
+      const raw = localStorage.getItem(`kite_workspaces_${user.userId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw) as WorkspaceConfig[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const hasDefault = parsed.some((w) => w.id === 'default');
+          setWorkspaces(hasDefault ? parsed : [DEFAULT_WORKSPACE, ...parsed]);
+          const savedActive = localStorage.getItem(`kite_active_ws_${user.userId}`);
+          setActiveWorkspaceId(
+            savedActive && parsed.some((w) => w.id === savedActive) ? savedActive : 'default',
+          );
+          return;
+        }
+      }
+    } catch {
+      // Ignore storage errors
+    }
+    setWorkspaces([DEFAULT_WORKSPACE]);
+    setActiveWorkspaceId('default');
+  }, [user]);
+
+  const persistWorkspaces = useCallback(
+    (nextList: WorkspaceConfig[], nextActiveId?: string) => {
+      if (!user) return;
+      try {
+        localStorage.setItem(`kite_workspaces_${user.userId}`, JSON.stringify(nextList));
+        if (nextActiveId) {
+          localStorage.setItem(`kite_active_ws_${user.userId}`, nextActiveId);
+        }
+      } catch {
+        // Ignore storage errors
+      }
+    },
+    [user],
+  );
 
   // Load initial instruments, quotes, and portfolio once authenticated
   useEffect(() => {
@@ -338,8 +390,58 @@ export default function App() {
     setUser(null);
     setPortfolio(null);
     setWsConnected(false);
+    setTerminalMode(false);
     setActiveTab('dashboard');
     setMobilePane('watchlist');
+  }
+
+  function handleSelectWorkspace(workspaceId: string) {
+    setActiveWorkspaceId(workspaceId);
+    persistWorkspaces(workspaces, workspaceId);
+    if (workspaceId !== 'default') {
+      setTerminalMode(true);
+      setMobilePane('workspace');
+    }
+  }
+
+  function handleCreateWorkspace(name: string, openInTerminal: boolean) {
+    const id = `ws-${Date.now().toString(36)}`;
+    const nextWs: WorkspaceConfig = {
+      id,
+      name,
+      showDepth: true,
+      showWatchlist: true,
+      showPositions: true,
+      showBlotter: true,
+    };
+    const nextList = [...workspaces, nextWs];
+    setWorkspaces(nextList);
+    setActiveWorkspaceId(id);
+    persistWorkspaces(nextList, id);
+    if (openInTerminal) {
+      setTerminalMode(true);
+      setMobilePane('workspace');
+    }
+    pushToast(`Created workspace "${name}".`);
+  }
+
+  function handleDeleteWorkspace(workspaceId: string) {
+    if (workspaceId === 'default') return;
+    const nextList = workspaces.filter((w) => w.id !== workspaceId);
+    const nextActive = activeWorkspaceId === workspaceId ? 'default' : activeWorkspaceId;
+    setWorkspaces(nextList);
+    setActiveWorkspaceId(nextActive);
+    persistWorkspaces(nextList, nextActive);
+  }
+
+  function handleUpdateWorkspace(updated: WorkspaceConfig) {
+    const nextList = workspaces.map((w) => (w.id === updated.id ? updated : w));
+    setWorkspaces(nextList);
+    persistWorkspaces(nextList, activeWorkspaceId);
+  }
+
+  function handleToggleTerminal(next?: boolean) {
+    setTerminalMode((prev) => (typeof next === 'boolean' ? next : !prev));
   }
 
   async function handleUpdateWatchlist(watchlistId: string, tokens: number[]) {
@@ -472,7 +574,9 @@ export default function App() {
 
   function handleSelectSymbolForTechnicals(token: number) {
     setSelectedToken(token);
-    setActiveTab('technicals');
+    if (!terminalMode) {
+      setActiveTab('technicals');
+    }
     setMobilePane('workspace');
   }
 
@@ -507,14 +611,24 @@ export default function App() {
   const orderInstrument = orderModal ? instrumentMap.get(orderModal.token) : undefined;
   const orderQuote = orderModal ? quotes[orderModal.token] : undefined;
 
+  const activeWorkspace =
+    workspaces.find((w) => w.id === activeWorkspaceId) ?? DEFAULT_WORKSPACE;
+
   return (
     <div className="min-h-screen flex flex-col bg-[#FFFFFF] dark:bg-[#121212] text-[#444444] dark:text-[#E0E0E0]">
       <TopBar
         user={user}
         activeTab={resolvedTab}
+        terminalMode={terminalMode}
+        workspaces={workspaces}
+        activeWorkspaceId={activeWorkspace.id}
         mobilePane={mobilePane}
         onSelectMobilePane={setMobilePane}
         onSelectTab={setActiveTab}
+        onToggleTerminal={handleToggleTerminal}
+        onSelectWorkspace={handleSelectWorkspace}
+        onCreateWorkspace={handleCreateWorkspace}
+        onDeleteWorkspace={handleDeleteWorkspace}
         niftyQuote={quotes[NIFTY_TOKEN]}
         sensexQuote={quotes[SENSEX_TOKEN]}
         wsConnected={wsConnected}
@@ -547,23 +661,41 @@ export default function App() {
           </div>
 
           <main
-            className={`flex-1 lg:h-[calc(100vh-3rem)] overflow-y-auto bg-[#FFFFFF] dark:bg-[#121212] ${
+            className={`flex-1 lg:h-[calc(100vh-50px)] overflow-y-auto bg-[#FFFFFF] dark:bg-[#121212] ${
               mobilePane === 'workspace' ? 'block' : 'hidden lg:block'
             }`}
           >
-            {resolvedTab === 'dashboard' && (
-              <DashboardView
+            {terminalMode ? (
+              <TerminalView
+                workspace={activeWorkspace}
                 portfolio={portfolio}
                 instruments={instruments}
                 quotes={quotes}
                 signals={signals}
                 activeWatchlistId={activeWatchlistId}
-                isAdmin={isAdmin}
-                onNavigate={setActiveTab}
-                onSelectSymbolForTechnicals={handleSelectSymbolForTechnicals}
+                selectedToken={selectedToken}
+                onSelectToken={setSelectedToken}
+                onUpdateWorkspace={handleUpdateWorkspace}
                 onOpenOrderModal={(token, side) => setOrderModal({ token, side })}
+                onCancelOrder={handleCancelOrder}
+                onExitPosition={handleExitPosition}
+                onExitTerminal={() => setTerminalMode(false)}
               />
-            )}
+            ) : (
+              <>
+                {resolvedTab === 'dashboard' && (
+                  <DashboardView
+                    portfolio={portfolio}
+                    instruments={instruments}
+                    quotes={quotes}
+                    signals={signals}
+                    activeWatchlistId={activeWatchlistId}
+                    isAdmin={isAdmin}
+                    onNavigate={setActiveTab}
+                    onSelectSymbolForTechnicals={handleSelectSymbolForTechnicals}
+                    onOpenOrderModal={(token, side) => setOrderModal({ token, side })}
+                  />
+                )}
 
             {resolvedTab === 'technicals' && (
               <TechnicalsView
@@ -610,13 +742,15 @@ export default function App() {
               />
             )}
 
-            {resolvedTab === 'admin' && isAdmin && (
-              <AdminView
-                currentUserId={user.userId}
-                onSyncSelfPortfolio={setPortfolio}
-                onNavigate={setActiveTab}
-                onNotify={pushToast}
-              />
+                {resolvedTab === 'admin' && isAdmin && (
+                  <AdminView
+                    currentUserId={user.userId}
+                    onSyncSelfPortfolio={setPortfolio}
+                    onNavigate={setActiveTab}
+                    onNotify={pushToast}
+                  />
+                )}
+              </>
             )}
           </main>
         </div>

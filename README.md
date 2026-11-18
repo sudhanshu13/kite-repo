@@ -217,6 +217,57 @@ docker run -d \
 
 ---
 
+### F. cPanel Deployment (`Setup Node.js App`)
+
+Shared and VPS cPanel servers run Node.js apps through **CloudLinux Node.js Selector (Phusion Passenger)**, which assigns `process.env.PORT` automatically and expects a `.js` / `.mjs` **Application startup file**.
+
+#### 1. Prerequisites in cPanel
+- **Software → Setup Node.js App** enabled (Node.js **20.x** or **22.x**).
+- **File Manager** / **Git Version Control** / **Terminal** access.
+- Outbound HTTPS (`443`) allowed if you want live Yahoo Finance NSE/BSE quotes (otherwise the app runs cleanly on its built-in fallback tick engine).
+
+#### 2. Build Locally Before Uploading *(Recommended for Shared Hosting)*
+Shared cPanel accounts often have tight memory limits that can kill `vite build`. Building the frontend and server bundle locally takes ~2 seconds and keeps your cPanel install tiny:
+
+```bash
+# On your local machine inside the project folder
+npm install
+npm run build
+npx esbuild server.ts --bundle --platform=node --format=esm --packages=external --outfile=server.mjs
+```
+
+Upload these files/folders to a folder **outside `public_html`** (for example `/home/<cpanel-user>/kite-sandbox/`):
+- `dist/` (compiled React + Tailwind production bundle)
+- `server.mjs` (compiled backend server, ~95 KB)
+- `package.json` and `package-lock.json` *(or `bun.lock`)*
+
+> **Note**: Do **not** upload to `public_html/` directly—cPanel's Node.js App should live in its own directory outside `public_html`.
+
+#### 3. Configure "Setup Node.js App" in cPanel
+1. Open **cPanel → Setup Node.js App → Create Application**.
+2. Fill in the fields:
+   - **Node.js version**: `22.x` (or `20.x`)
+   - **Application mode**: `Production`
+   - **Application root**: `kite-sandbox` (the folder where you uploaded `dist/`, `server.mjs`, `package.json`)
+   - **Application URL**: Select your domain or subdomain (e.g. `trade.yourdomain.com`)
+   - **Application startup file**: `server.mjs`
+3. Under **Environment Variables**, click **Add Variable** for each:
+   - `NODE_ENV` = `production`
+   - `SESSION_SECRET` = *(paste a 64-character random hex string)*
+   - `APP_URL` = `https://trade.yourdomain.com`
+4. Click **Create** (or **Save**).
+5. Click **Run NPM Install** inside the cPanel Node.js App screen (installs runtime dependencies like `express`, `ws`, `dotenv`).
+   - *Optional via cPanel Terminal*: enter the virtual environment command shown at the top of the cPanel Node.js App page and run `npm install --omit=dev`.
+6. Click **Restart** in cPanel Node.js App.
+
+#### 4. cPanel Database, WebSockets & Troubleshooting
+- **Database Persistence**: On first visit, `.data/store.json` is created automatically inside your Application root (`~/kite-sandbox/.data/store.json`). Ensure the folder has write permissions (`755`) and include `.data/` in cPanel backups.
+- **WebSockets vs SSE on Shared cPanel**: Apache + Phusion Passenger on some shared cPanel hosts blocks `/ws` WebSocket upgrades. No extra setup is required—the frontend automatically falls back to **Server-Sent Events (`/api/stream`)** and shows **Live** in the top bar.
+- **Port Binding**: `server.ts` reads `process.env.PORT` first (`Number(process.env.PORT) || 3000`), so Phusion Passenger's assigned port/socket works automatically.
+- **503 / Startup Errors**: Check `stderr.log` inside your Application root via **File Manager** or **Terminal**, and ensure `dist/index.html` exists inside the Application root with `NODE_ENV=production`.
+
+---
+
 ## 6. Default Accounts & Role-Based Access Control (RBAC)
 
 On first startup, `.data/store.json` is automatically seeded with two accounts:

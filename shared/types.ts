@@ -91,7 +91,7 @@ export interface TechnicalSummary {
 
 export type OrderSide = 'BUY' | 'SELL';
 export type ProductType = 'CNC' | 'MIS' | 'NRML';
-export type OrderType = 'MARKET' | 'LIMIT' | 'SL' | 'SL-M';
+export type OrderType = 'MARKET' | 'LIMIT' | 'CUSTOM' | 'SL' | 'SL-M';
 export type OrderStatus =
   | 'OPEN'
   | 'TRIGGER PENDING'

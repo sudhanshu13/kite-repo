@@ -147,7 +147,9 @@ export function applyFilledOrderToPortfolio(params: {
       // SELL CNC
       if (hIdx >= 0) {
         const prev = next.holdings[hIdx];
-        const soldCost = round2(prev.averagePrice * qty);
+        const unitCost = prev.quantity > 0 ? prev.investedValue / prev.quantity : prev.averagePrice;
+        const soldCost =
+          qty >= prev.quantity ? prev.investedValue : round2(unitCost * qty);
         const realized = round2(value - soldCost);
         next.realizedPnl = round2(next.realizedPnl + realized);
         next.availableCash = round2(next.availableCash + value);
@@ -157,10 +159,12 @@ export function applyFilledOrderToPortfolio(params: {
         if (remainingQty <= 0) {
           next.holdings.splice(hIdx, 1);
         } else {
+          const remainingInvested = Math.max(0, round2(prev.investedValue - soldCost));
           next.holdings[hIdx] = {
             ...prev,
             quantity: remainingQty,
-            investedValue: round2(remainingQty * prev.averagePrice),
+            investedValue: remainingInvested,
+            averagePrice: round2(remainingInvested / remainingQty),
             t1Quantity: Math.max(0, prev.t1Quantity - qty),
           };
         }
