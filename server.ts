@@ -200,8 +200,15 @@ async function startServer() {
     res.json({ instruments: filtered });
   });
 
-  app.get('/api/quotes', requireAuth, (_req, res) => {
-    res.json({ quotes: market.getAllQuotes() });
+  app.get('/api/quotes', requireAuth, (req, res) => {
+    const rawTokens = typeof req.query.tokens === 'string' ? req.query.tokens : '';
+    const tokens = rawTokens
+      ? rawTokens.split(',').map(Number).filter((n) => Number.isFinite(n) && n > 0)
+      : [];
+    res.json({
+      quotes: market.getAllQuotes(),
+      ...(tokens.length > 0 ? { signals: market.getWatchlistSignals(tokens) } : {}),
+    });
   });
 
   app.get('/api/technicals/:token', requireAuth, (req, res) => {
@@ -252,14 +259,22 @@ async function startServer() {
     if (set) {
       for (const ws of set) {
         if (ws.readyState === WebSocket.OPEN) {
-          ws.send(raw);
+          try {
+            ws.send(raw);
+          } catch {
+            set.delete(ws);
+          }
         }
       }
     }
     const sseSet = userSseClients.get(userId);
     if (sseSet) {
       for (const res of sseSet) {
-        res.write(`data: ${raw}\n\n`);
+        try {
+          res.write(`data: ${raw}\n\n`);
+        } catch {
+          sseSet.delete(res);
+        }
       }
     }
   }
@@ -273,6 +288,8 @@ async function startServer() {
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
     });
+    res.flushHeaders?.();
+    res.write(': connected\n\n');
 
     if (!userSseClients.has(user.userId)) {
       userSseClients.set(user.userId, new Set());
@@ -285,17 +302,27 @@ async function startServer() {
       ? Array.from(new Set(Object.values(portfolio.watchlists).flat()))
       : [];
 
-    res.write(
-      `data: ${JSON.stringify({
-        type: 'snapshot',
-        quotes: allQuotes,
-        signals: market.getWatchlistSignals(allWatchTokens),
-      })}\n\n`,
-    );
+    try {
+      res.write(
+        `data: ${JSON.stringify({
+          type: 'snapshot',
+          quotes: allQuotes,
+          signals: market.getWatchlistSignals(allWatchTokens),
+        })}\n\n`,
+      );
+    } catch {
+      userSseClients.get(user.userId)?.delete(res);
+      return;
+    }
 
     const heartbeat = setInterval(() => {
-      res.write(': ping\n\n');
-    }, 15000);
+      try {
+        res.write(': ping\n\n');
+      } catch {
+        clearInterval(heartbeat);
+        userSseClients.get(user.userId)?.delete(res);
+      }
+    }, 12000);
 
     req.on('close', () => {
       clearInterval(heartbeat);
@@ -556,21 +583,41 @@ async function startServer() {
     }
     userSockets.get(user.userId)!.add(ws);
 
+    const pingInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.ping();
+        } catch {
+          // Ignore transient ping errors
+        }
+      }
+    }, 20000);
+
     // Initial snapshot push
     const allQuotes = market.getAllQuotes();
     const portfolio = store.getPortfolio(user.userId);
     const allWatchTokens = portfolio
       ? Array.from(new Set(Object.values(portfolio.watchlists).flat()))
       : [];
-    ws.send(
-      JSON.stringify({
-        type: 'snapshot',
-        quotes: allQuotes,
-        signals: market.getWatchlistSignals(allWatchTokens),
-      }),
-    );
+    try {
+      ws.send(
+        JSON.stringify({
+          type: 'snapshot',
+          quotes: allQuotes,
+          signals: market.getWatchlistSignals(allWatchTokens),
+        }),
+      );
+    } catch {
+      // Ignore send errors on closing sockets
+    }
+
+    ws.on('error', () => {
+      clearInterval(pingInterval);
+      userSockets.get(user.userId)?.delete(ws);
+    });
 
     ws.on('close', () => {
+      clearInterval(pingInterval);
       userSockets.get(user.userId)?.delete(ws);
     });
   });
@@ -588,12 +635,20 @@ async function startServer() {
       });
       for (const client of wss.clients) {
         if (client.readyState === WebSocket.OPEN) {
-          client.send(payload);
+          try {
+            client.send(payload);
+          } catch {
+            // Ignore closed client send
+          }
         }
       }
       for (const sseSet of userSseClients.values()) {
         for (const res of sseSet) {
-          res.write(`data: ${payload}\n\n`);
+          try {
+            res.write(`data: ${payload}\n\n`);
+          } catch {
+            sseSet.delete(res);
+          }
         }
       }
     }

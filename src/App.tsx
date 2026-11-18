@@ -232,12 +232,22 @@ export default function App() {
     };
   }, [user]);
 
-  // Real-time stream connection: WebSocket primary with automatic SSE fallback
+  // Real-time stream connection: WebSocket primary -> SSE secondary -> HTTP live polling fallback
   useEffect(() => {
     if (!user) return;
     let closedByUser = false;
+    let wsUnsupported = false;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let wsFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+    let sseFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+
+    function stopPolling() {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    }
 
     function handleStreamMessage(raw: string) {
       try {
@@ -279,85 +289,234 @@ export default function App() {
       }
     }
 
+    let pollFailures = 0;
+
+    async function pollLiveOnce() {
+      if (closedByUser) return;
+      try {
+        const res = await apiFetch('/api/quotes');
+        if (!res.ok) {
+          pollFailures++;
+          if (res.status === 401 || pollFailures >= 2) setWsConnected(false);
+          return;
+        }
+        const data = (await res.json()) as {
+          quotes?: MarketQuote[];
+          signals?: WatchlistSignalsMap;
+        };
+        if (closedByUser) return;
+        pollFailures = 0;
+        if (Array.isArray(data.quotes)) {
+          setWsConnected(true);
+          setQuotes((prev) => {
+            const next = { ...prev };
+            for (const q of data.quotes!) next[q.token] = q;
+            return next;
+          });
+        }
+        if (data.signals) {
+          setSignals((prev) => ({ ...prev, ...data.signals }));
+        }
+      } catch {
+        pollFailures++;
+        if (!closedByUser && (!navigator.onLine || pollFailures >= 2)) {
+          setWsConnected(false);
+        }
+      }
+    }
+
+    function startPollingFallback() {
+      if (closedByUser || pollInterval) return;
+      void pollLiveOnce();
+      pollInterval = setInterval(() => {
+        void pollLiveOnce();
+      }, 1500);
+      if (!reconnectTimer) {
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          if (!closedByUser) {
+            if (wsUnsupported) connectSse();
+            else connectWs();
+          }
+        }, 12000);
+      }
+    }
+
     function connectSse() {
       if (closedByUser) return;
+      if (sseFallbackTimer) {
+        clearTimeout(sseFallbackTimer);
+        sseFallbackTimer = null;
+      }
       if (sseRef.current) {
         sseRef.current.close();
         sseRef.current = null;
       }
       const token = getAuthToken();
       const qs = token ? `?token=${encodeURIComponent(token)}` : '';
+      let sseOpened = false;
       const es = new EventSource(`/api/stream${qs}`, { withCredentials: true });
       sseRef.current = es;
 
+      sseFallbackTimer = setTimeout(() => {
+        if (!sseOpened && !closedByUser) {
+          es.close();
+          sseRef.current = null;
+          startPollingFallback();
+        }
+      }, 2500);
+
       es.onopen = () => {
+        sseOpened = true;
+        if (sseFallbackTimer) {
+          clearTimeout(sseFallbackTimer);
+          sseFallbackTimer = null;
+        }
+        stopPolling();
         setWsConnected(true);
       };
 
       es.onmessage = (event) => {
+        sseOpened = true;
+        if (sseFallbackTimer) {
+          clearTimeout(sseFallbackTimer);
+          sseFallbackTimer = null;
+        }
+        stopPolling();
         setWsConnected(true);
         handleStreamMessage(String(event.data));
       };
 
       es.onerror = () => {
-        setWsConnected(false);
+        if (sseFallbackTimer) {
+          clearTimeout(sseFallbackTimer);
+          sseFallbackTimer = null;
+        }
         es.close();
         sseRef.current = null;
         if (!closedByUser) {
-          reconnectTimer = setTimeout(connectWs, 2500);
+          startPollingFallback();
         }
       };
     }
 
     function connectWs() {
       if (closedByUser) return;
+      if (wsUnsupported) {
+        connectSse();
+        return;
+      }
+      if (wsFallbackTimer) {
+        clearTimeout(wsFallbackTimer);
+        wsFallbackTimer = null;
+      }
+      if (wsRef.current) {
+        try {
+          wsRef.current.close();
+        } catch {
+          // Ignore close error
+        }
+        wsRef.current = null;
+      }
+
       const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const token = getAuthToken();
       const qs = token ? `?token=${encodeURIComponent(token)}` : '';
       let opened = false;
-      const ws = new WebSocket(`${proto}//${window.location.host}/ws${qs}`);
+      let fellBack = false;
+
+      let ws: WebSocket;
+      try {
+        ws = new WebSocket(`${proto}//${window.location.host}/ws${qs}`);
+      } catch {
+        wsUnsupported = true;
+        connectSse();
+        return;
+      }
       wsRef.current = ws;
+
+      const triggerFallback = () => {
+        if (fellBack || closedByUser) return;
+        fellBack = true;
+        if (wsFallbackTimer) {
+          clearTimeout(wsFallbackTimer);
+          wsFallbackTimer = null;
+        }
+        if (!opened) wsUnsupported = true;
+        try {
+          ws.close();
+        } catch {
+          // Ignore close error
+        }
+        if (wsRef.current === ws) wsRef.current = null;
+        connectSse();
+      };
 
       wsFallbackTimer = setTimeout(() => {
         if (!opened && !closedByUser) {
-          ws.close();
-          connectSse();
+          triggerFallback();
         }
-      }, 2500);
+      }, 1500);
 
       ws.onopen = () => {
         opened = true;
-        if (wsFallbackTimer) clearTimeout(wsFallbackTimer);
+        if (wsFallbackTimer) {
+          clearTimeout(wsFallbackTimer);
+          wsFallbackTimer = null;
+        }
+        stopPolling();
         setWsConnected(true);
       };
 
       ws.onmessage = (event) => {
+        setWsConnected(true);
         handleStreamMessage(String(event.data));
       };
 
       ws.onclose = () => {
-        if (wsFallbackTimer) clearTimeout(wsFallbackTimer);
+        if (wsFallbackTimer) {
+          clearTimeout(wsFallbackTimer);
+          wsFallbackTimer = null;
+        }
+        if (wsRef.current === ws) wsRef.current = null;
         if (!opened) {
-          if (!closedByUser) connectSse();
+          triggerFallback();
           return;
         }
-        setWsConnected(false);
         if (!closedByUser) {
-          reconnectTimer = setTimeout(connectWs, 2000);
+          startPollingFallback();
         }
       };
 
       ws.onerror = () => {
-        ws.close();
+        if (!opened) {
+          triggerFallback();
+        }
       };
     }
+
+    const handleOnline = () => {
+      if (!closedByUser) {
+        wsUnsupported = false;
+        connectWs();
+      }
+    };
+    const handleOffline = () => {
+      setWsConnected(false);
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
 
     connectWs();
 
     return () => {
       closedByUser = true;
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
       if (reconnectTimer) clearTimeout(reconnectTimer);
       if (wsFallbackTimer) clearTimeout(wsFallbackTimer);
+      if (sseFallbackTimer) clearTimeout(sseFallbackTimer);
+      stopPolling();
       wsRef.current?.close();
       wsRef.current = null;
       sseRef.current?.close();
