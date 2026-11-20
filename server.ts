@@ -1,5 +1,7 @@
+import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { WebSocket, WebSocketServer } from 'ws';
 import type {
@@ -427,18 +429,18 @@ async function startServer() {
       });
       if (!probe.ok) {
         res.status(400).json({
-          error: `Kite Connect API returned HTTP ${probe.status}. Verify API Key and Access Token.`,
+          error: `External broker API returned HTTP ${probe.status}. Verify API Key and Access Token.`,
         });
         return;
       }
       const portfolio = store.setKiteBridge(user.userId, apiKey, accessToken);
       res.json({
         portfolio,
-        message: 'Kite Connect read-only quote bridge verified. Orders remain simulated.',
+        message: 'External read-only quote bridge verified. Orders remain simulated.',
       });
     } catch {
       res.status(400).json({
-        error: 'Unable to reach Kite Connect API endpoint from server.',
+        error: 'Unable to reach external broker API endpoint from server.',
       });
     }
   });
@@ -534,18 +536,38 @@ async function startServer() {
   });
 
   // --- Vite / Static SPA Middleware ---
-  if (process.env.NODE_ENV !== 'production') {
-    const { createServer: createViteServer } = await import('vite');
-    const vite = await createViteServer({
-      server: {
-        middlewareMode: true,
-        hmr: process.env.DISABLE_HMR !== 'true',
-      },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distDir = path.resolve(process.cwd(), 'dist');
+  const serverDir = path.dirname(fileURLToPath(import.meta.url));
+  const candidateDistDirs = [
+    path.resolve(serverDir, 'dist'),
+    path.resolve(process.cwd(), 'dist'),
+  ];
+  const distDir =
+    candidateDistDirs.find((dir) => fs.existsSync(path.join(dir, 'index.html'))) ??
+    candidateDistDirs[0];
+
+  const isProdMode =
+    process.env.NODE_ENV === 'production' ||
+    process.env.PASSENGER_APP_ENV === 'production';
+
+  let usedViteMiddleware = false;
+  if (!isProdMode) {
+    try {
+      const { createServer: createViteServer } = await import('vite');
+      const vite = await createViteServer({
+        server: {
+          middlewareMode: true,
+          hmr: process.env.DISABLE_HMR !== 'true',
+        },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+      usedViteMiddleware = true;
+    } catch {
+      // Fallback to prebuilt dist/ when vite is omitted on production hosts (e.g. cPanel)
+    }
+  }
+
+  if (!usedViteMiddleware) {
     app.use(express.static(distDir));
     app.get('*', (_req, res) => {
       res.sendFile(path.join(distDir, 'index.html'));
@@ -739,7 +761,7 @@ async function startServer() {
   }, 5000);
 
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Kite Sandbox server listening on http://0.0.0.0:${PORT}`);
+    console.log(`Trading Terminal server listening on http://0.0.0.0:${PORT}`);
   });
 }
 

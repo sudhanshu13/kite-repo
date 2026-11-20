@@ -340,7 +340,7 @@ export class TradingStore {
       this.data.users['KT8492'] = {
         userId: 'KT8492',
         userName: 'Aarav Mehta',
-        email: 'trader@kitesandbox.local',
+        email: 'trader@trading.local',
         role: 'user',
         disabled: false,
         createdAt: new Date().toISOString(),
@@ -349,7 +349,7 @@ export class TradingStore {
         portfolio: createSeedPortfolio(
           'KT8492',
           'Aarav Mehta',
-          'trader@kitesandbox.local',
+          'trader@trading.local',
           this.market,
         ),
       };
@@ -360,7 +360,7 @@ export class TradingStore {
       this.data.users['AD0001'] = {
         userId: 'AD0001',
         userName: 'Admin Desk',
-        email: 'admin@kitesandbox.local',
+        email: 'admin@trading.local',
         role: 'admin',
         disabled: false,
         createdAt: new Date().toISOString(),
@@ -369,7 +369,7 @@ export class TradingStore {
         portfolio: createSeedPortfolio(
           'AD0001',
           'Admin Desk',
-          'admin@kitesandbox.local',
+          'admin@trading.local',
           this.market,
           { openingBalance: 2500000, seedSampleData: false },
         ),
@@ -378,6 +378,13 @@ export class TradingStore {
     }
 
     for (const user of Object.values(this.data.users)) {
+      if (user.email.endsWith('@kitesandbox.local')) {
+        user.email = user.email.replace('@kitesandbox.local', '@trading.local');
+        if (user.portfolio?.email) {
+          user.portfolio.email = user.email;
+        }
+        dirty = true;
+      }
       if (!user.role) {
         user.role = user.userId === 'AD0001' ? 'admin' : 'user';
         dirty = true;
@@ -479,7 +486,7 @@ export class TradingStore {
     const userId = userIdInput.trim().toUpperCase();
     const record = this.data.users[userId];
     if (!record) {
-      return { ok: false, error: 'Invalid Kite Client ID or credentials.' };
+      return { ok: false, error: 'Invalid Client ID or credentials.' };
     }
     if (record.disabled) {
       return { ok: false, error: 'Account is suspended. Contact an administrator.' };
@@ -526,7 +533,7 @@ export class TradingStore {
       return { ok: false, error: 'Security PIN must be exactly 6 digits.' };
     }
     const userName = params.userName.trim() || 'Paper Trader';
-    const email = params.email.trim() || `${userId.toLowerCase()}@kitesandbox.local`;
+    const email = params.email.trim() || `${userId.toLowerCase()}@trading.local`;
 
     this.data.users[userId] = {
       userId,
@@ -993,7 +1000,7 @@ export class TradingStore {
         'DELETE',
         '/api/kite-bridge',
         200,
-        'Disconnected Kite Connect read-only bridge; using built-in live market feed',
+        'Disconnected external read-only bridge; using built-in live market feed',
       );
     } else {
       this.activeKiteSecrets.set(userId, {
@@ -1015,7 +1022,7 @@ export class TradingStore {
         'POST',
         '/api/kite-bridge',
         200,
-        'Configured Kite Connect read-only market quote bridge (simulated orders only)',
+        'Configured external read-only market quote bridge (simulated orders only)',
       );
     }
     this.save();
@@ -1058,7 +1065,7 @@ export class TradingStore {
     const role: UserRole = params.role === 'admin' ? 'admin' : 'user';
     const userName = params.userName.trim() || (role === 'admin' ? 'Admin User' : 'Paper Trader');
     const email =
-      params.email?.trim() || `${userId.toLowerCase()}@kitesandbox.local`;
+      params.email?.trim() || `${userId.toLowerCase()}@trading.local`;
 
     const openingBalance =
       typeof params.openingBalance === 'number' &&

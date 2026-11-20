@@ -118,7 +118,7 @@ export function LoginScreen({
         <div className="flex flex-col items-center text-center mb-6">
           <KiteLogo variant="app" className="w-12 h-12 mb-3" />
           <h1 className="text-[22px] font-normal text-[#444444] dark:text-[#E0E0E0] tracking-tight">
-            {mode === 'login' ? 'Login to Kite' : 'Create Sandbox ID'}
+            {mode === 'login' ? 'Login' : 'Create Client ID'}
           </h1>
           <p className="text-xs text-[#9B9B9B] dark:text-[#8C8C8C] mt-1">
             Technical analysis & simulated paper portfolio terminal
@@ -237,7 +237,7 @@ export function LoginScreen({
               ? 'Authenticating...'
               : mode === 'login'
                 ? 'Login'
-                : 'Create Sandbox Account'}
+                : 'Create Account'}
           </button>
         </form>
 
@@ -274,7 +274,7 @@ export function LoginScreen({
                 }}
                 className="hover:text-[#FF5722] transition-colors cursor-pointer"
               >
-                New to Kite Sandbox? Create a Client ID
+                New user? Create a Client ID
               </button>
             ) : (
               <button

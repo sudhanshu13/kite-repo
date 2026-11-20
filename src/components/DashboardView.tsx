@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Activity, Briefcase, PieChart } from 'lucide-react';
+import { Briefcase, Check, CircleDot, Copy, Droplet, PieChart, X } from 'lucide-react';
 import { computeHoldingMetrics, computePositionMetrics } from '../../shared/portfolioMath.ts';
 import type {
   Instrument,
@@ -11,10 +11,9 @@ import type {
 import {
   formatINR,
   formatPrice,
-  formatSigned,
   getChangeColorClass,
-  getSignalTextClass,
 } from '../utils/format.ts';
+import { StockScreenerView } from './StockScreenerView.tsx';
 import type { NavTab } from './TopBar.tsx';
 
 interface DashboardViewProps {
@@ -39,26 +38,21 @@ const ALLOCATION_COLORS = [
   '#EC407A',
 ];
 
+type DashboardSubTab = 'dashboard' | 'screener';
 type AllocationMode = 'current' | 'investment';
 
 export function DashboardView({
   portfolio,
   instruments,
   quotes,
-  signals,
-  activeWatchlistId,
-  isAdmin,
   onNavigate,
   onSelectSymbolForTechnicals,
   onOpenOrderModal,
 }: DashboardViewProps) {
+  const [subTab, setSubTab] = useState<DashboardSubTab>('dashboard');
   const [allocationMode, setAllocationMode] = useState<AllocationMode>('current');
-
-  const instrumentMap = useMemo(() => {
-    const m = new Map<number, Instrument>();
-    for (const i of instruments) m.set(i.token, i);
-    return m;
-  }, [instruments]);
+  const [referralModalOpen, setReferralModalOpen] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   const holdingsSummary = useMemo(() => {
     let totalInvestment = 0;
@@ -92,528 +86,507 @@ export function DashboardView({
     return { totalInvestment, currentValue, totalPnl, totalPnlPct, dayPnl, allocation };
   }, [portfolio.holdings, quotes, allocationMode]);
 
-  const positionsMtm = useMemo(() => {
-    let total = 0;
-    let realized = 0;
-    let openCount = 0;
-    for (const p of portfolio.positions) {
-      const m = computePositionMetrics(p, quotes[p.token]);
-      total += m.mtmPnl;
-      realized += p.realizedPnl;
-      if (m.isOpen) openCount++;
-    }
-    return { total, realized, openCount };
-  }, [portfolio.positions, quotes]);
+  const openPositions = useMemo(
+    () =>
+      portfolio.positions
+        .map((p) => ({ position: p, metrics: computePositionMetrics(p, quotes[p.token]) }))
+        .filter((r) => r.metrics.isOpen),
+    [portfolio.positions, quotes],
+  );
 
-  const activeWatchTokens = portfolio.watchlists[activeWatchlistId] ?? [];
+  const referralCode = `REF-${portfolio.userId}`;
 
-  const signalCounts = useMemo(() => {
-    let buy = 0;
-    let sell = 0;
-    for (const token of activeWatchTokens) {
-      const s = signals[token];
-      if (s === 'Strong Buy' || s === 'Buy') buy++;
-      else if (s === 'Strong Sell' || s === 'Sell') sell++;
-    }
-    return { buy, sell };
-  }, [activeWatchTokens, signals]);
+  function handleCopyReferral() {
+    navigator.clipboard?.writeText(referralCode).catch(() => {});
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  }
 
   return (
-    <div className="p-5 lg:p-9 max-w-[1100px] space-y-8">
-      {/* Greeting Header — Clean Kite Style */}
-      <div className="pb-4 border-b border-[#EEEEEE] dark:border-[#282828]">
-        <h1 className="text-[24px] font-normal text-[#444444] dark:text-[#E0E0E0] tracking-tight">
-          Hi, {portfolio.userName.split(' ')[0]}
-        </h1>
-      </div>
-
-      {/* Row 1: Equity & Positions (Open 2-Column Kite Overview) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pb-8 border-b border-[#EEEEEE] dark:border-[#282828]">
-        {/* Left: Equity */}
-        <section aria-labelledby="dash-equity-heading" className="space-y-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-[15px] font-normal text-[#444444] dark:text-[#E0E0E0]">
-              <PieChart className="w-4 h-4 text-[#9B9B9B]" />
-              <h2 id="dash-equity-heading">Equity</h2>
-            </div>
-            {isAdmin && (
-              <div className="flex items-center gap-3 text-xs">
-                <button
-                  type="button"
-                  onClick={() => onNavigate('funds')}
-                  className="text-[#4184F3] hover:underline cursor-pointer"
-                >
-                  Funds &amp; API
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onNavigate('admin')}
-                  className="text-[#FF5722] hover:underline font-medium cursor-pointer"
-                >
-                  Admin
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-start gap-8">
-            <div className="min-w-[140px]">
-              <div className="text-[36px] leading-[1.1] font-light tabular-nums text-[#444444] dark:text-[#E0E0E0]">
-                {formatINR(portfolio.availableCash)}
-              </div>
-              <div className="text-xs text-[#9B9B9B] mt-2">Margin available</div>
-            </div>
-
-            <div className="space-y-2 text-xs border-l border-[#EEEEEE] dark:border-[#282828] pl-7 flex-1">
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-[#9B9B9B]">Margins used</span>
-                <span className="tabular-nums font-normal text-[#444444] dark:text-[#E0E0E0]">
-                  {formatINR(portfolio.usedMargin)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-[#9B9B9B]">Opening balance</span>
-                <span className="tabular-nums font-normal text-[#444444] dark:text-[#E0E0E0]">
-                  {formatINR(portfolio.openingBalance)}
-                </span>
-              </div>
-              <div className="pt-0.5">
-                <button
-                  type="button"
-                  onClick={() => onNavigate('technicals')}
-                  className="text-[#4184F3] hover:underline cursor-pointer"
-                >
-                  View technicals
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Right: Positions & Day M2M */}
-        <section aria-labelledby="dash-m2m-heading" className="space-y-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-[15px] font-normal text-[#444444] dark:text-[#E0E0E0]">
-              <Activity className="w-4 h-4 text-[#9B9B9B]" />
-              <h2 id="dash-m2m-heading">Positions ({portfolio.positions.length})</h2>
-            </div>
-            <button
-              type="button"
-              onClick={() => onNavigate('positions')}
-              className="text-xs text-[#4184F3] hover:underline cursor-pointer"
-            >
-              Manage positions
-            </button>
-          </div>
-
-          <div className="flex items-start gap-8">
-            <div className="min-w-[140px]">
-              <div
-                className={`text-[36px] leading-[1.1] font-light tabular-nums ${
-                  portfolio.positions.length === 0
-                    ? 'text-[#444444] dark:text-[#E0E0E0]'
-                    : getChangeColorClass(positionsMtm.total)
-                }`}
-              >
-                {formatINR(positionsMtm.total, portfolio.positions.length > 0)}
-              </div>
-              <div className="text-xs text-[#9B9B9B] mt-2">Day&apos;s M2M</div>
-            </div>
-
-            <div className="space-y-2 text-xs border-l border-[#EEEEEE] dark:border-[#282828] pl-7 flex-1">
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-[#9B9B9B]">Open positions</span>
-                <span className="tabular-nums font-normal text-[#444444] dark:text-[#E0E0E0]">
-                  {positionsMtm.openCount}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-[#9B9B9B]">Realized P&amp;L</span>
-                <span
-                  className={`tabular-nums font-normal ${getChangeColorClass(positionsMtm.realized)}`}
-                >
-                  {formatINR(positionsMtm.realized, positionsMtm.realized !== 0)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-[#9B9B9B]">Watchlist signals</span>
-                <button
-                  type="button"
-                  onClick={() => onNavigate('technicals')}
-                  className="tabular-nums text-[#4184F3] hover:underline cursor-pointer"
-                >
-                  {signalCounts.buy} Buy · {signalCounts.sell} Sell
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      {/* Row 2: Signature Kite Full-Width Holdings Section + Stacked Allocation Bar */}
-      <section
-        aria-labelledby="dash-holdings-heading"
-        className="space-y-5 pb-8 border-b border-[#EEEEEE] dark:border-[#282828]"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[15px] font-normal text-[#444444] dark:text-[#E0E0E0]">
-            <Briefcase className="w-4 h-4 text-[#9B9B9B]" />
-            <h2 id="dash-holdings-heading">
-              Holdings ({portfolio.holdings.length})
-            </h2>
-          </div>
+    <div className="max-w-[1160px]">
+      {/* Top Two-Tab Bar: Dashboard | Stock screener */}
+      <div className="px-5 lg:px-9 border-b border-[#EEEEEE] dark:border-[#282828] flex items-center gap-7">
+        <div role="tablist" aria-label="Dashboard sections" className="flex items-center gap-7">
           <button
             type="button"
-            onClick={() => onNavigate('holdings')}
-            className="text-xs text-[#4184F3] hover:underline cursor-pointer"
+            role="tab"
+            aria-selected={subTab === 'dashboard'}
+            onClick={() => setSubTab('dashboard')}
+            className={`relative py-3.5 text-[13px] transition-colors cursor-pointer ${
+              subTab === 'dashboard'
+                ? 'text-[#FF5722] font-normal'
+                : 'text-[#666666] dark:text-[#A0A0A0] hover:text-[#FF5722]'
+            }`}
           >
-            View all
+            <span>Dashboard</span>
+            {subTab === 'dashboard' && (
+              <span
+                aria-hidden="true"
+                className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#FF5722]"
+              />
+            )}
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={subTab === 'screener'}
+            onClick={() => setSubTab('screener')}
+            className={`relative py-3.5 text-[13px] transition-colors cursor-pointer ${
+              subTab === 'screener'
+                ? 'text-[#FF5722] font-normal'
+                : 'text-[#666666] dark:text-[#A0A0A0] hover:text-[#FF5722]'
+            }`}
+          >
+            <span>Stock screener</span>
+            {subTab === 'screener' && (
+              <span
+                aria-hidden="true"
+                className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#FF5722]"
+              />
+            )}
           </button>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Holdings P&L + Breakdown */}
-          <div className="lg:col-span-5 flex items-start gap-8">
-            <div className="min-w-[140px]">
-              <div className="flex items-baseline gap-1.5 flex-wrap">
-                <span
-                  className={`text-[36px] leading-[1.1] font-light tabular-nums ${getChangeColorClass(holdingsSummary.totalPnl)}`}
-                >
-                  {formatINR(holdingsSummary.totalPnl, true)}
-                </span>
-                <span
-                  className={`text-xs font-normal tabular-nums ${getChangeColorClass(holdingsSummary.totalPnl)}`}
-                >
-                  {holdingsSummary.totalPnlPct >= 0 ? '+' : ''}
-                  {holdingsSummary.totalPnlPct.toFixed(2)}%
-                </span>
-              </div>
-              <div className="text-xs text-[#9B9B9B] mt-2">P&amp;L</div>
+      {/* Tab Content Area */}
+      <div className="p-5 lg:p-9">
+        {subTab === 'screener' ? (
+          <StockScreenerView
+            instruments={instruments}
+            quotes={quotes}
+            onSelectSymbolForTechnicals={onSelectSymbolForTechnicals}
+            onOpenOrderModal={onOpenOrderModal}
+          />
+        ) : (
+          <div className="space-y-8">
+            {/* Greeting Header */}
+            <div className="pb-5 border-b border-[#EEEEEE] dark:border-[#282828]">
+              <h1 className="text-[24px] font-normal text-[#444444] dark:text-[#E0E0E0] tracking-tight">
+                Hi, {portfolio.userName.split(' ')[0]}
+              </h1>
             </div>
 
-            <div className="space-y-2 text-xs border-l border-[#EEEEEE] dark:border-[#282828] pl-7 flex-1">
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-[#9B9B9B]">Current value</span>
-                <span className="tabular-nums font-normal text-[#444444] dark:text-[#E0E0E0]">
-                  {formatINR(holdingsSummary.currentValue)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-[#9B9B9B]">Investment</span>
-                <span className="tabular-nums font-normal text-[#444444] dark:text-[#E0E0E0]">
-                  {formatINR(holdingsSummary.totalInvestment)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-[#9B9B9B]">Day&apos;s P&amp;L</span>
-                <span
-                  className={`tabular-nums font-medium ${getChangeColorClass(holdingsSummary.dayPnl)}`}
-                >
-                  {formatINR(holdingsSummary.dayPnl, true)}
-                </span>
-              </div>
-            </div>
-          </div>
+            {/* Row 1: Equity & Commodity Margin Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pb-8 border-b border-[#EEEEEE] dark:border-[#282828]">
+              {/* Equity Column */}
+              <section aria-label="Equity" className="space-y-5">
+                <div className="flex items-center gap-2 text-[#444444] dark:text-[#E0E0E0]">
+                  <PieChart className="w-4 h-4 text-[#666666] dark:text-[#9B9B9B] stroke-[1.6]" />
+                  <h2 className="text-[15px] font-normal">Equity</h2>
+                </div>
 
-          {/* Horizontal Stacked Allocation Bar (Portfolio Distribution, Not a Price Chart) */}
-          <div className="lg:col-span-7 space-y-3">
-            {holdingsSummary.allocation.length === 0 ? (
-              <div className="text-xs text-[#9B9B9B] py-4">
-                No CNC equity holdings yet. Buy stocks via CNC from the Marketwatch to build your portfolio.
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs text-[#9B9B9B] tabular-nums">
-                    Portfolio weight ·{' '}
-                    {formatINR(
-                      allocationMode === 'current'
-                        ? holdingsSummary.currentValue
-                        : holdingsSummary.totalInvestment,
-                    )}
-                  </span>
+                <div className="flex items-start gap-7">
+                  <div className="min-w-[145px]">
+                    <div className="text-[36px] leading-[1.15] font-light tabular-nums text-[#444444] dark:text-[#F0F0F0] tracking-tight">
+                      {formatINR(portfolio.availableCash)}
+                    </div>
+                    <div className="text-[12px] text-[#9B9B9B] mt-2">Margin available</div>
+                  </div>
 
-                  <div
-                    role="group"
-                    aria-label="Allocation valuation mode"
-                    className="inline-flex border border-[#E5E5E5] dark:border-[#333333] rounded overflow-hidden text-[11px]"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setAllocationMode('current')}
-                      className={`px-2.5 py-1 transition-colors cursor-pointer ${
-                        allocationMode === 'current'
-                          ? 'bg-[#F5F7FA] dark:bg-[#242424] text-[#4184F3] font-medium'
-                          : 'text-[#666666] dark:text-[#A0A0A0] hover:bg-[#FAFAFA] dark:hover:bg-[#1E1E1E]'
-                      }`}
-                    >
-                      Current value
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAllocationMode('investment')}
-                      className={`px-2.5 py-1 border-l border-[#E5E5E5] dark:border-[#333333] transition-colors cursor-pointer ${
-                        allocationMode === 'investment'
-                          ? 'bg-[#F5F7FA] dark:bg-[#242424] text-[#4184F3] font-medium'
-                          : 'text-[#666666] dark:text-[#A0A0A0] hover:bg-[#FAFAFA] dark:hover:bg-[#1E1E1E]'
-                      }`}
-                    >
-                      Investment value
-                    </button>
+                  <div className="border-l border-[#EEEEEE] dark:border-[#282828] pl-6 space-y-2.5 text-[12px]">
+                    <div className="flex items-center gap-4">
+                      <span className="text-[#9B9B9B] min-w-[96px]">Margins used</span>
+                      <span className="tabular-nums text-[#444444] dark:text-[#E0E0E0]">
+                        {formatINR(portfolio.usedMargin)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="text-[#9B9B9B] min-w-[96px]">Opening balance</span>
+                      <span className="tabular-nums text-[#444444] dark:text-[#E0E0E0]">
+                        {formatINR(portfolio.openingBalance)}
+                      </span>
+                    </div>
+                    <div className="pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => onNavigate('funds')}
+                        className="inline-flex items-center gap-1.5 text-[12px] text-[#4184F3] hover:underline cursor-pointer"
+                      >
+                        <CircleDot className="w-3 h-3" />
+                        <span>View statement</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
+              </section>
 
-                {/* Flat Proportional Stacked Bar */}
-                <div
-                  className="h-7 w-full flex overflow-hidden rounded-[2px] bg-[#F4F4F4] dark:bg-[#222222]"
-                  role="img"
-                  aria-label="Holdings allocation breakdown bar"
-                >
-                  {holdingsSummary.allocation.map((item) => (
-                    <div
-                      key={item.token}
-                      style={{
-                        width: `${Math.max(item.pct, 0)}%`,
-                        backgroundColor: item.color,
-                      }}
-                      title={`${item.symbol}: ${item.pct.toFixed(1)}% (${formatINR(item.value)})`}
-                      className="h-full border-r border-white/60 dark:border-[#121212]/60 last:border-r-0 transition-[width] duration-300"
-                    />
-                  ))}
+              {/* Commodity Column */}
+              <section aria-label="Commodity" className="space-y-5">
+                <div className="flex items-center gap-2 text-[#444444] dark:text-[#E0E0E0]">
+                  <Droplet className="w-4 h-4 text-[#666666] dark:text-[#9B9B9B] stroke-[1.6]" />
+                  <h2 className="text-[15px] font-normal">Commodity</h2>
                 </div>
 
-                {/* Unboxed Symbol Weight Breakdown */}
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[11px]">
-                  {holdingsSummary.allocation.map((item) => (
-                    <button
-                      key={item.token}
-                      type="button"
-                      onClick={() => onSelectSymbolForTechnicals(item.token)}
-                      className="inline-flex items-center gap-1.5 text-[#444444] dark:text-[#CCCCCC] hover:text-[#4184F3] cursor-pointer"
-                    >
-                      <span
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: item.color }}
-                      />
-                      <span className="font-medium">{item.symbol}</span>
-                      <span className="tabular-nums text-[#9B9B9B]">
-                        {item.pct.toFixed(1)}%
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </section>
+                <div className="flex items-start gap-7">
+                  <div className="min-w-[145px]">
+                    <div className="text-[36px] leading-[1.15] font-light tabular-nums text-[#444444] dark:text-[#F0F0F0] tracking-tight">
+                      0
+                    </div>
+                    <div className="text-[12px] text-[#9B9B9B] mt-2">Margin available</div>
+                  </div>
 
-      {/* Active Positions Snapshot */}
-      {portfolio.positions.length > 0 && (
-        <section aria-labelledby="dash-positions-heading" className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <h2
-                id="dash-positions-heading"
-                className="text-[15px] font-normal text-[#444444] dark:text-[#E0E0E0]"
-              >
-                Open Positions ({portfolio.positions.length})
-              </h2>
-              <span
-                className={`text-xs font-medium tabular-nums ${getChangeColorClass(positionsMtm.total)}`}
-              >
-                M2M {formatINR(positionsMtm.total, true)}
-              </span>
+                  <div className="border-l border-[#EEEEEE] dark:border-[#282828] pl-6 space-y-2.5 text-[12px]">
+                    <div className="flex items-center gap-4">
+                      <span className="text-[#9B9B9B] min-w-[96px]">Margins used</span>
+                      <span className="tabular-nums text-[#444444] dark:text-[#E0E0E0]">0</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="text-[#9B9B9B] min-w-[96px]">Opening balance</span>
+                      <span className="tabular-nums text-[#444444] dark:text-[#E0E0E0]">0</span>
+                    </div>
+                    <div className="pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => onNavigate('funds')}
+                        className="inline-flex items-center gap-1.5 text-[12px] text-[#4184F3] hover:underline cursor-pointer"
+                      >
+                        <CircleDot className="w-3 h-3" />
+                        <span>View statement</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
-            <button
-              type="button"
-              onClick={() => onNavigate('positions')}
-              className="text-xs text-[#4184F3] hover:underline cursor-pointer"
-            >
-              Manage positions
-            </button>
-          </div>
 
-          <div className="overflow-x-auto border-t border-b border-[#EEEEEE] dark:border-[#282828]">
-            <table className="w-full text-xs text-left border-collapse">
-              <thead>
-                <tr className="border-b border-[#EEEEEE] dark:border-[#282828] text-[#9B9B9B]">
-                  <th className="py-2 px-3 font-normal">Product</th>
-                  <th className="py-2 px-3 font-normal">Instrument</th>
-                  <th className="py-2 px-3 font-normal text-right">Qty.</th>
-                  <th className="py-2 px-3 font-normal text-right">Avg.</th>
-                  <th className="py-2 px-3 font-normal text-right">LTP</th>
-                  <th className="py-2 px-3 font-normal text-right">P&amp;L</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#EEEEEE] dark:divide-[#282828]">
-                {portfolio.positions.map((pos) => {
-                  const m = computePositionMetrics(pos, quotes[pos.token]);
-                  const avg =
-                    pos.quantity >= 0
-                      ? pos.averageBuyPrice || pos.averageSellPrice
-                      : pos.averageSellPrice || pos.averageBuyPrice;
-                  return (
-                    <tr
-                      key={pos.id}
-                      className="hover:bg-[#F9F9F9] dark:hover:bg-[#1E1E1E]"
+            {/* Row 2: DEMAT Holdings (or Empty State) + Right Promo Card */}
+            <div className="flex flex-col lg:flex-row items-start justify-between gap-8 pt-2">
+              <div className="flex-1 min-w-0 w-full">
+                {portfolio.holdings.length === 0 ? (
+                  <div className="py-10 flex flex-col items-center justify-center text-center max-w-md mx-auto">
+                    <Briefcase className="w-16 h-16 text-[#D8D8D8] dark:text-[#3A3A3A] stroke-[1.1]" />
+                    <p className="text-[13.5px] text-[#888888] dark:text-[#9A9A9A] mt-5 leading-relaxed">
+                      You don&apos;t have any stocks in your DEMAT yet. Get started with
+                      absolutely free equity investments.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setSubTab('screener')}
+                      className="mt-5 px-6 py-2.5 bg-[#4184F3] hover:bg-[#3367D6] text-white text-[13px] font-medium rounded-[3px] transition-colors cursor-pointer"
                     >
-                      <td className="py-2.5 px-3 text-[11px] text-[#666666] dark:text-[#A0A0A0]">
-                        {pos.product}
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <button
-                          type="button"
-                          onClick={() => onSelectSymbolForTechnicals(pos.token)}
-                          className="text-[#444444] dark:text-[#E0E0E0] hover:text-[#4184F3] cursor-pointer"
-                        >
-                          {pos.symbol}
-                        </button>
-                        <span className="ml-1.5 text-[10px] text-[#9B9B9B] uppercase">
-                          {pos.exchange}
-                        </span>
-                      </td>
-                      <td
-                        className={`py-2.5 px-3 text-right tabular-nums font-medium ${
-                          pos.quantity > 0
-                            ? 'text-[#4184F3]'
-                            : pos.quantity < 0
-                              ? 'text-[#FF5722]'
-                              : 'text-[#9B9B9B]'
-                        }`}
-                      >
-                        {pos.quantity}
-                      </td>
-                      <td className="py-2.5 px-3 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0]">
-                        {formatPrice(avg)}
-                      </td>
-                      <td className="py-2.5 px-3 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0]">
-                        {formatPrice(m.ltp)}
-                      </td>
-                      <td
-                        className={`py-2.5 px-3 text-right tabular-nums font-medium ${getChangeColorClass(m.mtmPnl)}`}
-                      >
-                        {formatINR(m.mtmPnl, true)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {/* Watchlist Real-Time Price & Technical Pulse Table (No Price Charts) */}
-      <section aria-labelledby="dash-pulse-heading" className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2
-            id="dash-pulse-heading"
-            className="text-[15px] font-normal text-[#444444] dark:text-[#E0E0E0]"
-          >
-            Watchlist {activeWatchlistId} · Live Quotes &amp; Technicals
-          </h2>
-          <span className="text-xs tabular-nums text-[#9B9B9B]">
-            {activeWatchTokens.length} instruments
-          </span>
-        </div>
-
-        <div className="overflow-x-auto border-t border-b border-[#EEEEEE] dark:border-[#282828]">
-          <table className="w-full text-xs text-left border-collapse">
-            <thead>
-              <tr className="border-b border-[#EEEEEE] dark:border-[#282828] text-[#9B9B9B]">
-                <th className="py-2.5 px-3 font-normal">Instrument</th>
-                <th className="py-2.5 px-3 font-normal text-right">LTP</th>
-                <th className="py-2.5 px-3 font-normal text-right">Change</th>
-                <th className="py-2.5 px-3 font-normal text-right hidden sm:table-cell">Day Range</th>
-                <th className="py-2.5 px-3 font-normal text-right hidden md:table-cell">Volume</th>
-                <th className="py-2.5 px-3 font-normal text-right">Technicals</th>
-                <th className="py-2.5 px-3 font-normal text-right">Trade</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#EEEEEE] dark:divide-[#282828]">
-              {activeWatchTokens.map((token) => {
-                const inst = instrumentMap.get(token);
-                const q = quotes[token];
-                if (!inst || !q) return null;
-                const signal = signals[token] ?? 'Neutral';
-                return (
-                  <tr
-                    key={token}
-                    className="hover:bg-[#F9F9F9] dark:hover:bg-[#1E1E1E] transition-colors"
-                  >
-                    <td className="py-2.5 px-3">
+                      Start investing
+                    </button>
+                  </div>
+                ) : (
+                  <section aria-label={`Holdings (${portfolio.holdings.length})`} className="space-y-5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-[#444444] dark:text-[#E0E0E0]">
+                        <Briefcase className="w-4 h-4 text-[#666666] dark:text-[#9B9B9B] stroke-[1.6]" />
+                        <h2 className="text-[15px] font-normal">
+                          Holdings ({portfolio.holdings.length})
+                        </h2>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => onSelectSymbolForTechnicals(token)}
-                        className="text-left hover:text-[#4184F3] cursor-pointer"
+                        onClick={() => onNavigate('holdings')}
+                        className="text-[12px] text-[#4184F3] hover:underline cursor-pointer"
                       >
-                        <span className="font-medium text-[#444444] dark:text-[#E0E0E0]">
-                          {inst.symbol}
-                        </span>
-                        <span className="ml-1.5 text-[10px] text-[#9B9B9B]">
-                          {inst.exchange}
-                        </span>
+                        View all
                       </button>
-                    </td>
-                    <td
-                      className={`py-2.5 px-3 text-right tabular-nums font-medium ${getChangeColorClass(q.change)}`}
-                    >
-                      {formatPrice(q.ltp)}
-                    </td>
-                    <td
-                      className={`py-2.5 px-3 text-right tabular-nums ${getChangeColorClass(q.change)}`}
-                    >
-                      {formatSigned(q.change)} ({q.changePercent >= 0 ? '+' : ''}
-                      {q.changePercent.toFixed(2)}%)
-                    </td>
-                    <td className="py-2.5 px-3 text-right tabular-nums text-[#666666] dark:text-[#A0A0A0] hidden sm:table-cell">
-                      {formatPrice(q.low)} – {formatPrice(q.high)}
-                    </td>
-                    <td className="py-2.5 px-3 text-right tabular-nums text-[#666666] dark:text-[#A0A0A0] hidden md:table-cell">
-                      {q.volume > 0 ? q.volume.toLocaleString('en-IN') : '—'}
-                    </td>
-                    <td className="py-2.5 px-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => onSelectSymbolForTechnicals(token)}
-                        className={`font-medium hover:underline cursor-pointer ${getSignalTextClass(signal)}`}
-                      >
-                        {signal}
-                      </button>
-                    </td>
-                    <td className="py-2.5 px-3 text-right">
-                      {inst.isIndex ? (
-                        <span className="text-[#9B9B9B]">Index</span>
-                      ) : (
-                        <div className="inline-flex items-center gap-1">
+                    </div>
+
+                    <div className="space-y-5">
+                      <div className="flex flex-wrap items-start gap-8">
+                        <div className="shrink-0">
+                          <div
+                            className={`text-[32px] leading-[1.15] font-light tabular-nums whitespace-nowrap tracking-tight ${getChangeColorClass(
+                              holdingsSummary.totalPnl,
+                            )}`}
+                          >
+                            {formatINR(holdingsSummary.totalPnl, true)}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <span
+                              className={`text-[12px] tabular-nums ${getChangeColorClass(
+                                holdingsSummary.totalPnlPct,
+                              )}`}
+                            >
+                              {holdingsSummary.totalPnlPct >= 0 ? '+' : ''}
+                              {holdingsSummary.totalPnlPct.toFixed(2)}%
+                            </span>
+                            <span className="text-[12px] text-[#9B9B9B]">P&amp;L</span>
+                          </div>
+                        </div>
+
+                        <div className="border-l border-[#EEEEEE] dark:border-[#282828] pl-6 space-y-2 text-[12px] min-w-[200px]">
+                          <div className="flex items-center justify-between gap-6">
+                            <span className="text-[#9B9B9B] whitespace-nowrap">Current value</span>
+                            <span className="tabular-nums whitespace-nowrap text-[#444444] dark:text-[#E0E0E0]">
+                              {formatINR(holdingsSummary.currentValue)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-6">
+                            <span className="text-[#9B9B9B] whitespace-nowrap">Investment</span>
+                            <span className="tabular-nums whitespace-nowrap text-[#444444] dark:text-[#E0E0E0]">
+                              {formatINR(holdingsSummary.totalInvestment)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-6">
+                            <span className="text-[#9B9B9B] whitespace-nowrap">Day&apos;s P&amp;L</span>
+                            <span
+                              className={`tabular-nums whitespace-nowrap ${getChangeColorClass(holdingsSummary.dayPnl)}`}
+                            >
+                              {formatINR(holdingsSummary.dayPnl, true)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2.5">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-[#9B9B9B] tabular-nums">
+                            Portfolio weight ·{' '}
+                            {formatINR(
+                              allocationMode === 'current'
+                                ? holdingsSummary.currentValue
+                                : holdingsSummary.totalInvestment,
+                            )}
+                          </span>
+                          <div className="inline-flex border border-[#E5E5E5] dark:border-[#303030] rounded-[3px] overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setAllocationMode('current')}
+                              className={`px-2 py-0.5 text-[11px] cursor-pointer ${
+                                allocationMode === 'current'
+                                  ? 'bg-[#4184F3]/10 text-[#4184F3] font-medium'
+                                  : 'text-[#666666] dark:text-[#A0A0A0]'
+                              }`}
+                            >
+                              Current value
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAllocationMode('investment')}
+                              className={`px-2 py-0.5 text-[11px] border-l border-[#E5E5E5] dark:border-[#303030] cursor-pointer ${
+                                allocationMode === 'investment'
+                                  ? 'bg-[#4184F3]/10 text-[#4184F3] font-medium'
+                                  : 'text-[#666666] dark:text-[#A0A0A0]'
+                              }`}
+                            >
+                              Investment value
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="h-6 w-full flex gap-[2px] rounded-[2px] overflow-hidden bg-[#F3F4F6] dark:bg-[#222222]">
+                          {holdingsSummary.allocation.map((item) => (
+                            <button
+                              key={item.token}
+                              type="button"
+                              onClick={() => onSelectSymbolForTechnicals(item.token)}
+                              title={`${item.symbol}: ${item.pct.toFixed(1)}%`}
+                              style={{
+                                width: `${Math.max(item.pct, 2)}%`,
+                                backgroundColor: item.color,
+                              }}
+                              className="h-full hover:opacity-85 transition-opacity cursor-pointer"
+                            />
+                          ))}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
+                          {holdingsSummary.allocation.map((item) => (
+                            <button
+                              key={item.token}
+                              type="button"
+                              onClick={() => onSelectSymbolForTechnicals(item.token)}
+                              className="inline-flex items-center gap-1.5 text-[#666666] dark:text-[#A0A0A0] hover:text-[#4184F3] cursor-pointer"
+                            >
+                              <span
+                                className="w-2 h-2 rounded-full shrink-0"
+                                style={{ backgroundColor: item.color }}
+                              />
+                              <span>{item.symbol}</span>
+                              <span className="tabular-nums text-[#9B9B9B]">
+                                {item.pct.toFixed(1)}%
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Compact Open Positions Table when active */}
+                    {openPositions.length > 0 && (
+                      <div className="pt-5 border-t border-[#EEEEEE] dark:border-[#282828] space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-[14px] font-normal text-[#444444] dark:text-[#E0E0E0]">
+                            Open Positions ({openPositions.length})
+                          </h3>
                           <button
                             type="button"
-                            onClick={() => onOpenOrderModal(token, 'BUY')}
-                            aria-label={`Buy ${inst.symbol} from dashboard`}
-                            className="px-2 py-0.5 text-[11px] font-semibold bg-[#4184F3] hover:bg-[#3367D6] text-white rounded cursor-pointer"
+                            onClick={() => onNavigate('positions')}
+                            className="text-[12px] text-[#4184F3] hover:underline cursor-pointer"
                           >
-                            B
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onOpenOrderModal(token, 'SELL')}
-                            aria-label={`Sell ${inst.symbol} from dashboard`}
-                            className="px-2 py-0.5 text-[11px] font-semibold bg-[#FF5722] hover:bg-[#E64A19] text-white rounded cursor-pointer"
-                          >
-                            S
+                            Manage positions
                           </button>
                         </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                        <div className="overflow-x-auto border-t border-b border-[#EEEEEE] dark:border-[#282828]">
+                          <table className="w-full text-[12.5px] text-left border-collapse">
+                            <thead>
+                              <tr className="border-b border-[#EEEEEE] dark:border-[#282828] text-[11.5px] text-[#9B9B9B]">
+                                <th className="py-2 px-2 font-normal">Product</th>
+                                <th className="py-2 px-2 font-normal">Instrument</th>
+                                <th className="py-2 px-2 font-normal text-right">Qty.</th>
+                                <th className="py-2 px-2 font-normal text-right">Avg.</th>
+                                <th className="py-2 px-2 font-normal text-right">LTP</th>
+                                <th className="py-2 px-2 font-normal text-right">P&amp;L</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#F0F0F0] dark:divide-[#242424]">
+                              {openPositions.map(({ position, metrics }) => (
+                                <tr
+                                  key={position.id}
+                                  className="hover:bg-[#FAFAFA] dark:hover:bg-[#1E1E1E]"
+                                >
+                                  <td className="py-2 px-2 text-[11px] text-[#666666] dark:text-[#A0A0A0]">
+                                    {position.product}
+                                  </td>
+                                  <td className="py-2 px-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => onSelectSymbolForTechnicals(position.token)}
+                                      className="text-[#444444] dark:text-[#E0E0E0] hover:text-[#4184F3] cursor-pointer"
+                                    >
+                                      {position.symbol}
+                                    </button>
+                                    <span className="ml-1 text-[10px] text-[#9B9B9B]">
+                                      {position.exchange}
+                                    </span>
+                                  </td>
+                                  <td
+                                    className={`py-2 px-2 text-right tabular-nums ${
+                                      position.quantity > 0 ? 'text-[#4184F3]' : 'text-[#DF514C]'
+                                    }`}
+                                  >
+                                    {position.quantity}
+                                  </td>
+                                  <td className="py-2 px-2 text-right tabular-nums">
+                                    {formatPrice(
+                                      position.quantity >= 0
+                                        ? position.averageBuyPrice
+                                        : position.averageSellPrice,
+                                    )}
+                                  </td>
+                                  <td className="py-2 px-2 text-right tabular-nums">
+                                    {formatPrice(metrics.ltp)}
+                                  </td>
+                                  <td
+                                    className={`py-2 px-2 text-right tabular-nums font-medium ${getChangeColorClass(
+                                      metrics.mtmPnl,
+                                    )}`}
+                                  >
+                                    {formatINR(metrics.mtmPnl, true)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+                )}
+              </div>
+
+              {/* Right Referral Promo Card (Matching Reference Screenshot) */}
+              <aside
+                aria-label="Refer your friends and family"
+                className="w-full lg:w-[272px] shrink-0 rounded-[4px] bg-[#F6F7F9] dark:bg-[#1B1D21] border border-[#EFEFEF] dark:border-[#2A2C30] p-5 relative overflow-hidden"
+              >
+                <div className="relative z-10 max-w-[195px]">
+                  <h3 className="text-[18px] font-semibold text-[#333333] dark:text-[#F0F0F0] leading-[1.28]">
+                    Refer your friends &amp; family
+                  </h3>
+                  <p className="text-[12px] text-[#666666] dark:text-[#A0A0A0] mt-2 leading-relaxed">
+                    Earn 10% of their brokerage plus 300 reward points
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setReferralModalOpen(true)}
+                    className="mt-4 px-4 py-1.5 bg-[#4184F3] hover:bg-[#3367D6] text-white text-[12px] font-medium rounded-[3px] transition-colors cursor-pointer"
+                  >
+                    Know more
+                  </button>
+                </div>
+
+                {/* Decorative Gift Box SVG Accent */}
+                <svg
+                  viewBox="0 0 96 84"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden="true"
+                  className="w-24 h-20 absolute right-0 bottom-0 pointer-events-none select-none"
+                >
+                  <path d="M10 74L96 58V84H10V74Z" fill="#4184F3" opacity="0.9" />
+                  <rect x="28" y="34" width="38" height="34" rx="2" transform="rotate(-14 28 34)" fill="#F9A825" />
+                  <rect x="24" y="28" width="44" height="10" rx="2" transform="rotate(-14 24 28)" fill="#FF7043" />
+                  <rect x="44" y="29" width="7" height="39" transform="rotate(-14 44 29)" fill="#FF5722" />
+                  <circle cx="42" cy="24" r="5" fill="#FF7043" />
+                  <circle cx="51" cy="22" r="5" fill="#FF5722" />
+                  <circle cx="77" cy="24" r="2" fill="#FF8A65" />
+                  <circle cx="24" cy="54" r="2" fill="#4184F3" />
+                </svg>
+              </aside>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Referral Info Modal */}
+      {referralModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Referral program details"
+          className="fixed inset-0 z-50 bg-black/45 flex items-center justify-center p-4"
+        >
+          <div className="bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#333333] rounded w-full max-w-sm shadow-xl overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-[#EEEEEE] dark:border-[#2C2C2C] flex items-center justify-between">
+              <h3 className="text-sm font-medium text-[#444444] dark:text-[#E0E0E0]">
+                Refer your friends &amp; family
+              </h3>
+              <button
+                type="button"
+                onClick={() => setReferralModalOpen(false)}
+                aria-label="Close referral details"
+                className="text-[#9B9B9B] hover:text-[#444444] dark:hover:text-[#E0E0E0] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4 text-xs text-[#666666] dark:text-[#A0A0A0]">
+              <p className="leading-relaxed">
+                Share your referral code with friends and family to earn 10% of their
+                brokerage plus 300 reward points on every successful account activation.
+              </p>
+              <div className="flex items-center justify-between px-3 py-2 bg-[#F9F9F9] dark:bg-[#141414] border border-[#E5E5E5] dark:border-[#303030] rounded">
+                <span className="font-mono font-medium text-[#444444] dark:text-[#E0E0E0]">
+                  {referralCode}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyReferral}
+                  className="inline-flex items-center gap-1 text-[#4184F3] hover:underline font-medium cursor-pointer"
+                >
+                  {copiedCode ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-[#4CAF50]" />
+                      <span>Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      </section>
+      )}
     </div>
   );
 }
-

@@ -653,7 +653,7 @@ export function AdminView({
                   type="email"
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
-                  placeholder="rohan@kitesandbox.local"
+                  placeholder="rohan@trading.local"
                   className="w-full px-3 py-2 bg-white dark:bg-[#121212] border border-[#E0E0E0] dark:border-[#333333] rounded focus:outline-none focus:border-[#4184F3]"
                 />
               </div>

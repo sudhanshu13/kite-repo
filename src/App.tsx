@@ -11,6 +11,7 @@ import type {
   WatchlistSignalsMap,
 } from '../shared/types.ts';
 import { AdminView } from './components/AdminView.tsx';
+import { BidsView } from './components/BidsView.tsx';
 import { DashboardView } from './components/DashboardView.tsx';
 import { FundsApiView } from './components/FundsApiView.tsx';
 import { HoldingsView } from './components/HoldingsView.tsx';
@@ -742,7 +743,7 @@ export default function App() {
   if (!authChecked) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FFFFFF] dark:bg-[#121212] text-xs text-[#9B9B9B]">
-        Initializing Kite Sandbox...
+        Initializing Trading Terminal...
       </div>
     );
   }
@@ -764,9 +765,7 @@ export default function App() {
 
   const isAdmin = user.role === 'admin';
   const resolvedTab: NavTab =
-    !isAdmin && (activeTab === 'funds' || activeTab === 'admin')
-      ? 'dashboard'
-      : activeTab;
+    !isAdmin && activeTab === 'admin' ? 'dashboard' : activeTab;
   const orderInstrument = orderModal ? instrumentMap.get(orderModal.token) : undefined;
   const orderQuote = orderModal ? quotes[orderModal.token] : undefined;
 
@@ -790,11 +789,15 @@ export default function App() {
         onDeleteWorkspace={handleDeleteWorkspace}
         niftyQuote={quotes[NIFTY_TOKEN]}
         sensexQuote={quotes[SENSEX_TOKEN]}
+        instruments={instruments}
+        quotes={quotes}
+        recentOrders={portfolio?.orders ?? []}
         wsConnected={wsConnected}
         openOrdersCount={openOrdersCount}
         openPositionsCount={openPositionsCount}
         theme={theme}
         onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+        onPlaceOrder={handlePlaceOrder}
         onLogout={handleLogout}
       />
 
@@ -877,6 +880,7 @@ export default function App() {
                 quotes={quotes}
                 onOpenOrderModal={(token, side) => setOrderModal({ token, side })}
                 onSelectSymbolForTechnicals={handleSelectSymbolForTechnicals}
+                onNotify={pushToast}
               />
             )}
 
@@ -891,10 +895,13 @@ export default function App() {
               />
             )}
 
-            {resolvedTab === 'funds' && isAdmin && (
+            {resolvedTab === 'bids' && <BidsView onNotify={pushToast} />}
+
+            {resolvedTab === 'funds' && (
               <FundsApiView
                 portfolio={portfolio}
                 wsConnected={wsConnected}
+                isAdmin={isAdmin}
                 onAddFunds={handleAddFunds}
                 onResetPortfolio={handleResetPortfolio}
                 onConfigureKiteBridge={handleConfigureKiteBridge}

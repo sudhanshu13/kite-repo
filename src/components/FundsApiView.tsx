@@ -6,6 +6,7 @@ import { formatINR, formatTime, getChangeColorClass } from '../utils/format.ts';
 interface FundsApiViewProps {
   portfolio: PortfolioState;
   wsConnected: boolean;
+  isAdmin: boolean;
   onAddFunds: (amount: number) => Promise<{ ok: boolean; error?: string }>;
   onResetPortfolio: () => Promise<void>;
   onConfigureKiteBridge: (
@@ -17,6 +18,7 @@ interface FundsApiViewProps {
 export function FundsApiView({
   portfolio,
   wsConnected,
+  isAdmin,
   onAddFunds,
   onResetPortfolio,
   onConfigureKiteBridge,
@@ -52,14 +54,14 @@ export function FundsApiView({
       if (res.ok) {
         setBridgeMsg({
           type: 'ok',
-          text: res.message || 'Kite Connect read-only quote bridge configured.',
+          text: res.message || 'External read-only quote bridge configured.',
         });
         setApiKey('');
         setAccessToken('');
       } else {
         setBridgeMsg({
           type: 'err',
-          text: res.error || 'Failed to verify Kite Connect credentials.',
+          text: res.error || 'Failed to verify external API credentials.',
         });
       }
     } finally {
@@ -85,21 +87,25 @@ export function FundsApiView({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#EEEEEE] dark:border-[#282828]">
         <div>
           <h1 className="text-[18px] font-normal text-[#444444] dark:text-[#E0E0E0]">
-            Funds &amp; Real-Time API Configuration
+            {isAdmin ? 'Funds & Real-Time API Configuration' : 'Funds'}
           </h1>
           <p className="text-xs text-[#9B9B9B] mt-0.5">
-            Simulated paper trading margin and read-only market quote stream settings
+            {isAdmin
+              ? 'Simulated paper trading margin and read-only market quote stream settings'
+              : 'Instant, zero-cost paper margin summary for Equity and Commodity segments'}
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onResetPortfolio}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-[#E0E0E0] dark:border-[#333333] text-[#666666] dark:text-[#A0A0A0] hover:border-[#DF514C] hover:text-[#DF514C] rounded transition-colors cursor-pointer self-start sm:self-auto"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>Reset Paper Portfolio</span>
-        </button>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={onResetPortfolio}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-[#E0E0E0] dark:border-[#333333] text-[#666666] dark:text-[#A0A0A0] hover:border-[#DF514C] hover:text-[#DF514C] rounded transition-colors cursor-pointer self-start sm:self-auto"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Reset Paper Portfolio</span>
+          </button>
+        )}
       </div>
 
       {/* 2-Column Layout: Virtual Margin Ledger + API Bridge */}
@@ -142,39 +148,102 @@ export function FundsApiView({
             </div>
           </div>
 
-          <form onSubmit={handleAddFunds} className="pt-2 space-y-2.5">
-            <label
-              htmlFor="add-virtual-funds"
-              className="block text-xs font-medium text-[#666666] dark:text-[#A0A0A0]"
-            >
-              Add virtual capital (₹)
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                id="add-virtual-funds"
-                type="number"
-                min="1"
-                max="10000000"
-                required
-                value={addAmount}
-                onChange={(e) => setAddAmount(e.target.value)}
-                className="flex-1 px-3 py-2 text-xs tabular-nums bg-white dark:bg-[#121212] border border-[#E0E0E0] dark:border-[#333333] rounded focus:outline-none focus:border-[#4184F3]"
-              />
-              <button
-                type="submit"
-                className="px-4 py-2 text-xs font-semibold bg-[#4184F3] hover:bg-[#3367D6] text-white rounded transition-colors cursor-pointer"
+          {isAdmin ? (
+            <form onSubmit={handleAddFunds} className="pt-2 space-y-2.5">
+              <label
+                htmlFor="add-virtual-funds"
+                className="block text-xs font-medium text-[#666666] dark:text-[#A0A0A0]"
               >
-                Add funds
-              </button>
+                Add virtual capital (₹)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="add-virtual-funds"
+                  type="number"
+                  min="1"
+                  max="10000000"
+                  required
+                  value={addAmount}
+                  onChange={(e) => setAddAmount(e.target.value)}
+                  className="flex-1 px-3 py-2 text-xs tabular-nums bg-white dark:bg-[#121212] border border-[#E0E0E0] dark:border-[#333333] rounded focus:outline-none focus:border-[#4184F3]"
+                />
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-xs font-semibold bg-[#4184F3] hover:bg-[#3367D6] text-white rounded transition-colors cursor-pointer"
+                >
+                  Add funds
+                </button>
+              </div>
+              {fundsStatus && (
+                <p className="text-xs text-[#4CAF50] dark:text-[#4ADE80]">{fundsStatus}</p>
+              )}
+            </form>
+          ) : (
+            <div className="divide-y divide-[#EEEEEE] dark:divide-[#282828] text-xs pt-1 border-t border-[#EEEEEE] dark:border-[#282828]">
+              <div className="py-2 flex justify-between">
+                <span className="text-[#9B9B9B]">SPAN</span>
+                <span className="tabular-nums text-[#444444] dark:text-[#E0E0E0]">₹0.00</span>
+              </div>
+              <div className="py-2 flex justify-between">
+                <span className="text-[#9B9B9B]">Delivery margin</span>
+                <span className="tabular-nums text-[#444444] dark:text-[#E0E0E0]">₹0.00</span>
+              </div>
+              <div className="py-2 flex justify-between">
+                <span className="text-[#9B9B9B]">Exposure</span>
+                <span className="tabular-nums text-[#444444] dark:text-[#E0E0E0]">₹0.00</span>
+              </div>
+              <div className="py-2 flex justify-between">
+                <span className="text-[#9B9B9B]">Collateral (Equity)</span>
+                <span className="tabular-nums text-[#444444] dark:text-[#E0E0E0]">₹0.00</span>
+              </div>
             </div>
-            {fundsStatus && (
-              <p className="text-xs text-[#4CAF50] dark:text-[#4ADE80]">{fundsStatus}</p>
-            )}
-          </form>
+          )}
         </section>
 
-        {/* WebSocket & Optional Kite Connect Read-Only Quote Bridge */}
-        <section className="border border-[#EEEEEE] dark:border-[#282828] bg-white dark:bg-[#181818] rounded p-5 space-y-4">
+        {!isAdmin ? (
+          <section className="border border-[#EEEEEE] dark:border-[#282828] bg-white dark:bg-[#181818] rounded p-5 space-y-5">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-medium text-[#444444] dark:text-[#E0E0E0]">
+                Commodity
+              </h2>
+              <span className="text-xs text-[#9B9B9B]">MCX Paper Segment</span>
+            </div>
+
+            <div className="divide-y divide-[#EEEEEE] dark:divide-[#282828] text-xs">
+              <div className="py-2.5 flex justify-between">
+                <span className="text-[#9B9B9B]">Available margin</span>
+                <span className="tabular-nums font-semibold text-sm text-[#444444] dark:text-[#E0E0E0]">
+                  ₹0.00
+                </span>
+              </div>
+              <div className="py-2.5 flex justify-between">
+                <span className="text-[#9B9B9B]">Used margin</span>
+                <span className="tabular-nums font-medium">₹0.00</span>
+              </div>
+              <div className="py-2.5 flex justify-between">
+                <span className="text-[#9B9B9B]">Available cash</span>
+                <span className="tabular-nums font-medium">₹0.00</span>
+              </div>
+              <div className="py-2.5 flex justify-between">
+                <span className="text-[#9B9B9B]">Opening balance</span>
+                <span className="tabular-nums font-medium">₹0.00</span>
+              </div>
+              <div className="py-2.5 flex justify-between">
+                <span className="text-[#9B9B9B]">Payin</span>
+                <span className="tabular-nums font-medium">₹0.00</span>
+              </div>
+              <div className="py-2.5 flex justify-between">
+                <span className="text-[#9B9B9B]">Total collateral</span>
+                <span className="tabular-nums font-medium">₹0.00</span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-[#9B9B9B] leading-relaxed">
+              Virtual margin deposits and portfolio resets are managed by your workspace administrator.
+            </p>
+          </section>
+        ) : (
+          <section className="border border-[#EEEEEE] dark:border-[#282828] bg-white dark:bg-[#181818] rounded p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Wifi className="w-4 h-4 text-[#4184F3]" />
@@ -200,7 +269,7 @@ export function FundsApiView({
             </div>
             <p className="text-[#666666] dark:text-[#A0A0A0] leading-relaxed">
               Active feed: <strong className="font-medium">{portfolio.kiteApiConfig.mode}</strong>.
-              External Kite Connect credentials (optional) are used strictly server-side for
+              External broker API credentials (optional) are used strictly server-side for
               read-only live LTP quotes—no real-money orders are ever transmitted.
             </p>
           </div>
@@ -219,26 +288,26 @@ export function FundsApiView({
                 onClick={handleDisconnectBridge}
                 className="px-4 py-2 text-xs font-medium border border-[#DF514C] text-[#DF514C] hover:bg-[#DF514C]/10 rounded cursor-pointer"
               >
-                Disconnect Kite Connect Bridge
+                Disconnect Quote Bridge
               </button>
             </div>
           ) : (
             <form onSubmit={handleConnectBridge} className="space-y-3">
               <div>
                 <label
-                  htmlFor="kite-api-key"
+                  htmlFor="broker-api-key"
                   className="block text-[11px] font-medium text-[#666666] dark:text-[#A0A0A0] mb-1"
                 >
-                  Kite Connect API Key (Optional · Read-Only Quotes)
+                  Broker API Key (Optional · Read-Only Quotes)
                 </label>
                 <div className="relative">
                   <KeyRound className="w-3.5 h-3.5 text-[#9B9B9B] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
-                    id="kite-api-key"
+                    id="broker-api-key"
                     type="text"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="Enter Kite Connect api_key"
+                    placeholder="Enter broker api_key"
                     className="w-full pl-8 pr-3 py-2 text-xs tabular-nums bg-white dark:bg-[#121212] border border-[#E0E0E0] dark:border-[#333333] rounded focus:outline-none focus:border-[#4184F3]"
                   />
                 </div>
@@ -246,17 +315,17 @@ export function FundsApiView({
 
               <div>
                 <label
-                  htmlFor="kite-access-token"
+                  htmlFor="broker-access-token"
                   className="block text-[11px] font-medium text-[#666666] dark:text-[#A0A0A0] mb-1"
                 >
                   Access Token
                 </label>
                 <input
-                  id="kite-access-token"
+                  id="broker-access-token"
                   type="password"
                   value={accessToken}
                   onChange={(e) => setAccessToken(e.target.value)}
-                  placeholder="Enter Kite Connect access_token"
+                  placeholder="Enter broker access_token"
                   className="w-full px-3 py-2 text-xs tabular-nums bg-white dark:bg-[#121212] border border-[#E0E0E0] dark:border-[#333333] rounded focus:outline-none focus:border-[#4184F3]"
                 />
               </div>
@@ -283,9 +352,11 @@ export function FundsApiView({
             </p>
           )}
         </section>
+        )}
       </div>
 
-      {/* Real API Execution Audit Log */}
+      {/* Real API Execution Audit Log (Admin only) */}
+      {isAdmin && (
       <section className="border border-[#EEEEEE] dark:border-[#282828] bg-white dark:bg-[#181818] rounded overflow-hidden">
         <div className="px-4 py-2.5 bg-[#F9F9F9] dark:bg-[#121212] border-b border-[#EEEEEE] dark:border-[#282828] flex items-center justify-between">
           <h2 className="text-xs font-medium text-[#444444] dark:text-[#E0E0E0]">
@@ -326,6 +397,7 @@ export function FundsApiView({
           </table>
         </div>
       </section>
+      )}
     </div>
   );
 }
