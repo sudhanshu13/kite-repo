@@ -174,4 +174,45 @@ test('TradingStore updateHolding and deleteHolding modify and remove CNC holding
   }
 });
 
+test('TradingStore updatePosition and deletePosition modify and remove positions accurately', () => {
+  const { store, cleanup } = createTempStore();
+  try {
+    const initial = store.getPortfolio('KT8492');
+    assert.ok(initial && initial.positions.length > 0);
+    const target = initial.positions[0];
+
+    const updated = store.updatePosition('KT8492', target.id, 30, 1125.5);
+    assert.equal(updated.ok, true);
+    if (updated.ok) {
+      const p = updated.portfolio.positions.find((item) => item.id === target.id);
+      assert.ok(p);
+      assert.equal(p.quantity, 30);
+      assert.equal(p.averageBuyPrice, 1125.5);
+    }
+
+    const updatedShort = store.updatePosition('KT8492', target.id, -20, 1150);
+    assert.equal(updatedShort.ok, true);
+    if (updatedShort.ok) {
+      const p = updatedShort.portfolio.positions.find((item) => item.id === target.id);
+      assert.ok(p);
+      assert.equal(p.quantity, -20);
+      assert.equal(p.averageSellPrice, 1150);
+    }
+
+    assert.equal(store.updatePosition('KT8492', target.id, 10, 0).ok, false);
+
+    const deleted = store.deletePosition('KT8492', target.id);
+    assert.equal(deleted.ok, true);
+    if (deleted.ok) {
+      assert.equal(
+        deleted.portfolio.positions.some((item) => item.id === target.id),
+        false,
+      );
+    }
+  } finally {
+    cleanup();
+  }
+});
+
+
 

@@ -892,6 +892,70 @@ export class TradingStore {
     return { ok: true, portfolio: user.portfolio };
   }
 
+  public updatePosition(
+    userId: string,
+    positionId: string,
+    quantity: number,
+    averagePrice: number,
+  ): { ok: true; portfolio: PortfolioState } | { ok: false; error: string } {
+    const user = this.data.users[userId];
+    if (!user) return { ok: false, error: 'User not found.' };
+    const pos = user.portfolio.positions.find((p) => p.id === positionId);
+    if (!pos) return { ok: false, error: 'Position not found.' };
+
+    const cleanQty = Math.trunc(Number(quantity));
+    const cleanAvg = Math.round(Number(averagePrice) * 100) / 100;
+    if (!Number.isFinite(cleanQty)) {
+      return { ok: false, error: 'Quantity must be a valid whole number.' };
+    }
+    if (!Number.isFinite(cleanAvg) || cleanAvg <= 0) {
+      return { ok: false, error: 'Average price must be greater than zero.' };
+    }
+
+    pos.quantity = cleanQty;
+    if (cleanQty >= 0) {
+      pos.buyQuantity = Math.max(cleanQty, pos.sellQuantity + cleanQty);
+      pos.averageBuyPrice = cleanAvg;
+      pos.buyValue = Math.round(pos.buyQuantity * cleanAvg * 100) / 100;
+    } else {
+      const absQty = Math.abs(cleanQty);
+      pos.sellQuantity = Math.max(absQty, pos.buyQuantity + absQty);
+      pos.averageSellPrice = cleanAvg;
+      pos.sellValue = Math.round(pos.sellQuantity * cleanAvg * 100) / 100;
+    }
+
+    this.appendApiLog(
+      userId,
+      'PATCH',
+      `/api/positions/${positionId}`,
+      200,
+      `Updated ${pos.symbol} (${pos.product}) position to Qty ${cleanQty} @ ₹${cleanAvg.toFixed(2)}`,
+    );
+    this.save();
+    return { ok: true, portfolio: user.portfolio };
+  }
+
+  public deletePosition(
+    userId: string,
+    positionId: string,
+  ): { ok: true; portfolio: PortfolioState } | { ok: false; error: string } {
+    const user = this.data.users[userId];
+    if (!user) return { ok: false, error: 'User not found.' };
+    const idx = user.portfolio.positions.findIndex((p) => p.id === positionId);
+    if (idx === -1) return { ok: false, error: 'Position not found.' };
+
+    const [removed] = user.portfolio.positions.splice(idx, 1);
+    this.appendApiLog(
+      userId,
+      'DELETE',
+      `/api/positions/${positionId}`,
+      200,
+      `Removed ${removed.symbol} (${removed.product}) from positions`,
+    );
+    this.save();
+    return { ok: true, portfolio: user.portfolio };
+  }
+
   public exitPosition(
     userId: string,
     positionId: string,

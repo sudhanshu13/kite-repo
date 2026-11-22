@@ -384,6 +384,45 @@ async function startServer() {
     res.json({ portfolio: result.portfolio });
   });
 
+  app.patch('/api/positions/:id', requireAuth, (req, res) => {
+    const user = (req as express.Request & { authUser: AuthUser }).authUser;
+    const positionId = String(req.params.id);
+    const { quantity, averagePrice } = req.body as {
+      quantity?: number;
+      averagePrice?: number;
+    };
+    const result = store.updatePosition(
+      user.userId,
+      positionId,
+      Number(quantity),
+      Number(averagePrice),
+    );
+    if (!result.ok) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+    broadcastToUser(user.userId, {
+      type: 'portfolio:update',
+      portfolio: result.portfolio,
+    });
+    res.json({ portfolio: result.portfolio });
+  });
+
+  app.delete('/api/positions/:id', requireAuth, (req, res) => {
+    const user = (req as express.Request & { authUser: AuthUser }).authUser;
+    const positionId = String(req.params.id);
+    const result = store.deletePosition(user.userId, positionId);
+    if (!result.ok) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+    broadcastToUser(user.userId, {
+      type: 'portfolio:update',
+      portfolio: result.portfolio,
+    });
+    res.json({ portfolio: result.portfolio });
+  });
+
   app.patch('/api/holdings/:token', requireAuth, (req, res) => {
     const user = (req as express.Request & { authUser: AuthUser }).authUser;
     const token = Number(req.params.token);

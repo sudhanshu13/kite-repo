@@ -686,6 +686,40 @@ export default function App() {
     }
   }
 
+  async function handleUpdatePosition(
+    positionId: string,
+    quantity: number,
+    averagePrice: number,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const res = await apiFetch(`/api/positions/${encodeURIComponent(positionId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quantity, averagePrice }),
+    });
+    const data = (await res.json()) as { portfolio?: PortfolioState; error?: string };
+    if (!res.ok || !data.portfolio) {
+      return { ok: false, error: data.error || 'Failed to update position.' };
+    }
+    setPortfolio(data.portfolio);
+    pushToast('Position updated.');
+    return { ok: true };
+  }
+
+  async function handleDeletePosition(
+    positionId: string,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const res = await apiFetch(`/api/positions/${encodeURIComponent(positionId)}`, {
+      method: 'DELETE',
+    });
+    const data = (await res.json()) as { portfolio?: PortfolioState; error?: string };
+    if (!res.ok || !data.portfolio) {
+      return { ok: false, error: data.error || 'Failed to delete position.' };
+    }
+    setPortfolio(data.portfolio);
+    pushToast('Position removed.');
+    return { ok: true };
+  }
+
   async function handleUpdateHolding(
     token: number,
     quantity: number,
@@ -924,8 +958,11 @@ export default function App() {
               <PositionsView
                 positions={portfolio.positions}
                 quotes={quotes}
+                onOpenOrderModal={(token, side) => setOrderModal({ token, side })}
                 onExitPosition={handleExitPosition}
                 onConvertPosition={handleConvertPosition}
+                onUpdatePosition={handleUpdatePosition}
+                onDeletePosition={handleDeletePosition}
                 onSelectSymbolForTechnicals={handleSelectSymbolForTechnicals}
                 onGoToDashboard={() => setActiveTab('dashboard')}
               />
