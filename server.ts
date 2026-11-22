@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { WebSocket, WebSocketServer } from 'ws';
+import { searchInstruments } from './shared/derivatives.ts';
 import type {
   AdminCreateUserRequest,
   AdminUpdateUserRequest,
@@ -186,19 +187,13 @@ async function startServer() {
 
   // --- Market Data & Technicals Routes ---
   app.get('/api/instruments', requireAuth, (req, res) => {
-    const q = String(req.query.q || '').trim().toLowerCase();
+    const q = String(req.query.q || '').trim();
     const list = market.getInstruments();
     if (!q) {
       res.json({ instruments: list });
       return;
     }
-    const filtered = list.filter(
-      (i) =>
-        i.symbol.toLowerCase().includes(q) ||
-        i.name.toLowerCase().includes(q) ||
-        i.exchange.toLowerCase().includes(q) ||
-        i.sector.toLowerCase().includes(q),
-    );
+    const filtered = searchInstruments(list, q, { limit: 40 });
     res.json({ instruments: filtered });
   });
 
@@ -378,6 +373,45 @@ async function startServer() {
   app.post('/api/positions/:id/convert', requireAuth, (req, res) => {
     const user = (req as express.Request & { authUser: AuthUser }).authUser;
     const result = store.convertPosition(user.userId, String(req.params.id), market);
+    if (!result.ok) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+    broadcastToUser(user.userId, {
+      type: 'portfolio:update',
+      portfolio: result.portfolio,
+    });
+    res.json({ portfolio: result.portfolio });
+  });
+
+  app.patch('/api/holdings/:token', requireAuth, (req, res) => {
+    const user = (req as express.Request & { authUser: AuthUser }).authUser;
+    const token = Number(req.params.token);
+    const { quantity, averagePrice } = req.body as {
+      quantity?: number;
+      averagePrice?: number;
+    };
+    const result = store.updateHolding(
+      user.userId,
+      token,
+      Number(quantity),
+      Number(averagePrice),
+    );
+    if (!result.ok) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+    broadcastToUser(user.userId, {
+      type: 'portfolio:update',
+      portfolio: result.portfolio,
+    });
+    res.json({ portfolio: result.portfolio });
+  });
+
+  app.delete('/api/holdings/:token', requireAuth, (req, res) => {
+    const user = (req as express.Request & { authUser: AuthUser }).authUser;
+    const token = Number(req.params.token);
+    const result = store.deleteHolding(user.userId, token);
     if (!result.ok) {
       res.status(400).json({ error: result.error });
       return;
@@ -648,8 +682,13 @@ async function startServer() {
     if (updatedQuotes.length === 0) return;
     const hasSseClients = Array.from(userSseClients.values()).some((s) => s.size > 0);
     if (wss.clients.size > 0 || hasSseClients) {
-      const updatedTokens = updatedQuotes.map((q) => q.token);
-      const signals = market.getWatchlistSignals(updatedTokens);
+      const signalTokens = updatedQuotes
+        .map((q) => q.token)
+        .filter((t) => {
+          const inst = INSTRUMENT_MAP.get(t);
+          return inst && inst.instrumentType !== 'CE' && inst.instrumentType !== 'PE';
+        });
+      const signals = market.getWatchlistSignals(signalTokens);
       const payload = JSON.stringify({
         type: 'ticks',
         quotes: updatedQuotes,

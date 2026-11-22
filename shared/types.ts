@@ -1,4 +1,6 @@
-export type Exchange = 'NSE' | 'BSE' | 'NFO' | 'INDICES';
+export type Exchange = 'NSE' | 'BSE' | 'NFO' | 'BFO' | 'INDICES';
+
+export type InstrumentType = 'EQ' | 'INDEX' | 'FUT' | 'CE' | 'PE';
 
 export interface Instrument {
   token: number;
@@ -10,6 +12,12 @@ export interface Instrument {
   basePrice: number;
   sector: string;
   isIndex?: boolean;
+  instrumentType?: InstrumentType;
+  underlying?: string;
+  expiry?: string;
+  strike?: number;
+  optionIv?: number;
+  daysToExpiry?: number;
   yahooSymbol?: string;
   derivedFromToken?: number;
   futuresBasisBps?: number;

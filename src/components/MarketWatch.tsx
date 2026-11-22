@@ -12,6 +12,10 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import {
+  searchInstruments,
+  type SearchCategoryFilter,
+} from '../../shared/derivatives.ts';
 import type {
   Instrument,
   MarketQuote,
@@ -82,7 +86,12 @@ function buildDefaultGroups(
       primary.push(token);
       continue;
     }
-    if (inst.isIndex || inst.exchange === 'INDICES' || inst.exchange === 'NFO') {
+    if (
+      inst.isIndex ||
+      inst.exchange === 'INDICES' ||
+      inst.exchange === 'NFO' ||
+      inst.exchange === 'BFO'
+    ) {
       indexOrFno.push(token);
     } else if (inst.sector === 'Banking') {
       banking.push(token);
@@ -125,6 +134,7 @@ export function MarketWatch({
   onOpenOrderModal,
 }: MarketWatchProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchCategory, setSearchCategory] = useState<SearchCategoryFilter>('all');
   const [searchFocused, setSearchFocused] = useState(false);
   const [expandedDepthToken, setExpandedDepthToken] = useState<number | null>(null);
   const [flashMap, setFlashMap] = useState<Record<number, 'up' | 'down'>>({});
@@ -262,18 +272,13 @@ export function MarketWatch({
   }, [savedGroupsByWl, activeWatchlistId, activeTokens, instrumentMap, sortMode, quotes]);
 
   const searchResults = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = searchQuery.trim();
     if (!q) return [];
-    return instruments
-      .filter(
-        (inst) =>
-          inst.symbol.toLowerCase().includes(q) ||
-          inst.name.toLowerCase().includes(q) ||
-          inst.exchange.toLowerCase().includes(q) ||
-          inst.sector.toLowerCase().includes(q),
-      )
-      .slice(0, 12);
-  }, [instruments, searchQuery]);
+    return searchInstruments(instruments, q, {
+      category: searchCategory,
+      limit: 25,
+    });
+  }, [instruments, searchQuery, searchCategory]);
 
   function persistCurrentGroups(nextGroups: WatchlistGroup[]) {
     setSavedGroupsByWl((prev) => {
@@ -340,6 +345,7 @@ export function MarketWatch({
       onUpdateWatchlist(activeWatchlistId, [...activeTokens, token]);
     }
     setSearchQuery('');
+    setSearchCategory('all');
     setSearchFocused(false);
   }
 
@@ -391,7 +397,10 @@ export function MarketWatch({
           {searchQuery ? (
             <button
               type="button"
-              onClick={() => setSearchQuery('')}
+              onClick={() => {
+                setSearchQuery('');
+                setSearchCategory('all');
+              }}
               aria-label="Clear search"
               className="mr-1.5 text-[#9B9B9B] hover:text-[#444444] dark:hover:text-[#E0E0E0] p-1 cursor-pointer shrink-0"
             >
@@ -466,91 +475,145 @@ export function MarketWatch({
           </div>
         </div>
 
-        {/* Autocomplete Dropdown */}
+        {/* Autocomplete Dropdown with F&O Category Tabs */}
         {searchFocused && searchQuery.trim().length > 0 && (
-          <div className="absolute left-3 right-3 top-[46px] z-30 bg-white dark:bg-[#181818] border border-[#E0E0E0] dark:border-[#333333] rounded-[3px] shadow-lg max-h-72 overflow-y-auto divide-y divide-[#EEEEEE] dark:divide-[#282828]">
-            {searchResults.length === 0 ? (
-              <div className="px-3 py-4 text-xs text-center text-[#9B9B9B]">
-                No instruments matched &ldquo;{searchQuery}&rdquo;
-              </div>
-            ) : (
-              searchResults.map((inst) => {
-                const alreadyAdded = activeTokens.includes(inst.token);
-                const q = quotes[inst.token];
+          <div className="absolute left-3 right-3 top-[46px] z-30 bg-white dark:bg-[#181818] border border-[#E0E0E0] dark:border-[#333333] rounded-[3px] shadow-lg overflow-hidden">
+            {/* Segment Filter Strip */}
+            <div
+              role="tablist"
+              aria-label="Search instrument category"
+              className="flex items-center gap-1 px-2 py-1.5 bg-[#FAFAFA] dark:bg-[#141414] border-b border-[#EEEEEE] dark:border-[#282828] text-[11px]"
+            >
+              {(
+                [
+                  { id: 'all', label: 'All' },
+                  { id: 'eq', label: 'Equity' },
+                  { id: 'fut', label: 'Futures' },
+                  { id: 'opt', label: 'Options' },
+                ] as { id: SearchCategoryFilter; label: string }[]
+              ).map((cat) => {
+                const active = searchCategory === cat.id;
                 return (
-                  <div
-                    key={inst.token}
-                    className="flex items-center justify-between gap-2 px-3 py-2 hover:bg-[#F5F7FA] dark:hover:bg-[#212121]"
+                  <button
+                    key={cat.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setSearchCategory(cat.id)}
+                    className={`px-2 py-0.5 rounded-[2px] transition-colors cursor-pointer ${
+                      active
+                        ? 'bg-[#FF5722]/12 text-[#FF5722] font-medium'
+                        : 'text-[#666666] dark:text-[#A0A0A0] hover:text-[#222222] dark:hover:text-[#E0E0E0]'
+                    }`}
                   >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onSelectSymbolForTechnicals(inst.token);
-                        setSearchFocused(false);
-                      }}
-                      className="text-left min-w-0 flex-1 cursor-pointer"
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-medium text-[#444444] dark:text-[#E0E0E0] truncate">
-                          {inst.symbol}
-                        </span>
-                        <span className="text-[9.5px] text-[#9B9B9B] uppercase">
-                          {inst.exchange === 'INDICES' ? 'INDEX' : inst.exchange}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-[#9B9B9B] truncate">{inst.name}</div>
-                    </button>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {q && (
-                        <span className="text-xs tabular-nums text-[#666666] dark:text-[#A0A0A0] mr-1">
-                          {formatPrice(q.ltp)}
-                        </span>
-                      )}
-                      {!inst.isIndex && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => onOpenOrderModal(inst.token, 'BUY')}
-                            aria-label={`Buy ${inst.symbol}`}
-                            className="px-2 py-0.5 text-[11px] font-semibold bg-[#4184F3] text-white rounded hover:bg-[#3367D6] cursor-pointer"
-                          >
-                            B
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onOpenOrderModal(inst.token, 'SELL')}
-                            aria-label={`Sell ${inst.symbol}`}
-                            className="px-2 py-0.5 text-[11px] font-semibold bg-[#FF5722] text-white rounded hover:bg-[#E64A19] cursor-pointer"
-                          >
-                            S
-                          </button>
-                        </>
-                      )}
-                      {alreadyAdded ? (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSymbol(inst.token)}
-                          aria-label={`Remove ${inst.symbol} from watchlist`}
-                          className="p-1 text-[#DF514C] hover:bg-[#DF514C]/10 rounded cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleAddSymbol(inst.token)}
-                          aria-label={`Add ${inst.symbol} to watchlist`}
-                          className="p-1 text-[#4CAF50] hover:bg-[#4CAF50]/10 rounded cursor-pointer"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                    {cat.label}
+                  </button>
                 );
-              })
-            )}
+              })}
+              <span className="ml-auto text-[10px] text-[#9B9B9B] tabular-nums pr-1">
+                {searchResults.length} shown
+              </span>
+            </div>
+
+            <div className="max-h-80 overflow-y-auto divide-y divide-[#EEEEEE] dark:divide-[#282828]">
+              {searchResults.length === 0 ? (
+                <div className="px-3 py-4 text-xs text-center text-[#9B9B9B]">
+                  No instruments matched &ldquo;{searchQuery}&rdquo;
+                </div>
+              ) : (
+                searchResults.map((inst) => {
+                  const alreadyAdded = activeTokens.includes(inst.token);
+                  const q = quotes[inst.token];
+                  const isFno = inst.exchange === 'NFO' || inst.exchange === 'BFO';
+                  const typeBadgeClass =
+                    inst.instrumentType === 'CE'
+                      ? 'bg-[#EBF7EC] text-[#4CAF50] dark:bg-[#193320] dark:text-[#4ADE80]'
+                      : inst.instrumentType === 'PE'
+                        ? 'bg-[#FDECEC] text-[#DF514C] dark:bg-[#351B1B] dark:text-[#F87171]'
+                        : inst.instrumentType === 'FUT'
+                          ? 'bg-[#EFF6FF] text-[#4184F3] dark:bg-[#1D2B3D] dark:text-[#60A5FA]'
+                          : 'bg-[#F3F4F6] text-[#888888] dark:bg-[#262626] dark:text-[#A0A0A0]';
+                  return (
+                    <div
+                      key={inst.token}
+                      className="flex items-center justify-between gap-2 px-3 py-2 hover:bg-[#F5F7FA] dark:hover:bg-[#212121]"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSelectSymbolForTechnicals(inst.token);
+                          setSearchFocused(false);
+                        }}
+                        className="text-left min-w-0 flex-1 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-xs font-medium text-[#444444] dark:text-[#E0E0E0] truncate">
+                            {inst.symbol}
+                          </span>
+                          <span
+                            className={`text-[9px] px-1 py-0.2 rounded-[2px] uppercase shrink-0 font-medium ${typeBadgeClass}`}
+                          >
+                            {inst.exchange === 'INDICES' ? 'INDEX' : inst.exchange}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-[#9B9B9B] truncate">
+                          {isFno
+                            ? `${inst.name} · Lot ${inst.lotSize}`
+                            : inst.name}
+                        </div>
+                      </button>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {q && (
+                          <span className="text-xs tabular-nums text-[#666666] dark:text-[#A0A0A0] mr-1">
+                            {formatPrice(q.ltp)}
+                          </span>
+                        )}
+                        {!inst.isIndex && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => onOpenOrderModal(inst.token, 'BUY')}
+                              aria-label={`Buy ${inst.symbol}`}
+                              className="px-2 py-0.5 text-[11px] font-semibold bg-[#4184F3] text-white rounded hover:bg-[#3367D6] cursor-pointer"
+                            >
+                              B
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onOpenOrderModal(inst.token, 'SELL')}
+                              aria-label={`Sell ${inst.symbol}`}
+                              className="px-2 py-0.5 text-[11px] font-semibold bg-[#FF5722] text-white rounded hover:bg-[#E64A19] cursor-pointer"
+                            >
+                              S
+                            </button>
+                          </>
+                        )}
+                        {alreadyAdded ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSymbol(inst.token)}
+                            aria-label={`Remove ${inst.symbol} from watchlist`}
+                            className="p-1 text-[#DF514C] hover:bg-[#DF514C]/10 rounded cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleAddSymbol(inst.token)}
+                            aria-label={`Add ${inst.symbol} to watchlist`}
+                            className="p-1 text-[#4CAF50] hover:bg-[#4CAF50]/10 rounded cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -1,3 +1,4 @@
+import { deriveOptionSnapshotFromSpot } from '../shared/derivatives.ts';
 import {
   deriveFuturesSnapshotFromSpot,
   parseYahooChartResponse,
@@ -21,7 +22,7 @@ async function fetchYahooChart(
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; KiteSandbox/1.0)',
+        'User-Agent': 'Mozilla/5.0 (compatible; MarketFeed/1.0)',
         Accept: 'application/json',
       },
     });
@@ -61,11 +62,14 @@ export async function fetchLiveMarketSnapshots(
     }
   }
 
-  // Derive futures prices from live underlying index spot quotes
+  // Derive futures, options, and cross-exchange prices from live underlying spot quotes
   for (const inst of instruments) {
     if (!inst.derivedFromToken) continue;
     const spotSnap = byToken.get(inst.derivedFromToken);
-    if (spotSnap) {
+    if (!spotSnap) continue;
+    if (inst.instrumentType === 'CE' || inst.instrumentType === 'PE') {
+      byToken.set(inst.token, deriveOptionSnapshotFromSpot(inst, spotSnap));
+    } else {
       byToken.set(inst.token, deriveFuturesSnapshotFromSpot(inst, spotSnap));
     }
   }

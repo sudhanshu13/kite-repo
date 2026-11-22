@@ -837,6 +837,61 @@ export class TradingStore {
     return executions;
   }
 
+  public updateHolding(
+    userId: string,
+    token: number,
+    quantity: number,
+    averagePrice: number,
+  ): { ok: true; portfolio: PortfolioState } | { ok: false; error: string } {
+    const user = this.data.users[userId];
+    if (!user) return { ok: false, error: 'User not found.' };
+    const holding = user.portfolio.holdings.find((h) => h.token === token);
+    if (!holding) return { ok: false, error: 'Holding not found.' };
+
+    const cleanQty = Math.floor(Number(quantity));
+    const cleanAvg = Math.round(Number(averagePrice) * 100) / 100;
+    if (!Number.isFinite(cleanQty) || cleanQty <= 0) {
+      return { ok: false, error: 'Quantity must be a positive whole number.' };
+    }
+    if (!Number.isFinite(cleanAvg) || cleanAvg <= 0) {
+      return { ok: false, error: 'Average price must be greater than zero.' };
+    }
+
+    holding.quantity = cleanQty;
+    holding.averagePrice = cleanAvg;
+    holding.investedValue = Math.round(cleanQty * cleanAvg * 100) / 100;
+    this.appendApiLog(
+      userId,
+      'PATCH',
+      `/api/holdings/${token}`,
+      200,
+      `Updated ${holding.symbol} holding to Qty ${cleanQty} @ ₹${cleanAvg.toFixed(2)}`,
+    );
+    this.save();
+    return { ok: true, portfolio: user.portfolio };
+  }
+
+  public deleteHolding(
+    userId: string,
+    token: number,
+  ): { ok: true; portfolio: PortfolioState } | { ok: false; error: string } {
+    const user = this.data.users[userId];
+    if (!user) return { ok: false, error: 'User not found.' };
+    const idx = user.portfolio.holdings.findIndex((h) => h.token === token);
+    if (idx === -1) return { ok: false, error: 'Holding not found.' };
+
+    const [removed] = user.portfolio.holdings.splice(idx, 1);
+    this.appendApiLog(
+      userId,
+      'DELETE',
+      `/api/holdings/${token}`,
+      200,
+      `Removed ${removed.symbol} from paper holdings`,
+    );
+    this.save();
+    return { ok: true, portfolio: user.portfolio };
+  }
+
   public exitPosition(
     userId: string,
     positionId: string,

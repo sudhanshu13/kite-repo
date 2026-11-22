@@ -142,3 +142,36 @@ test('CUSTOM order executes immediately at user-entered price and averages into 
   }
 });
 
+test('TradingStore updateHolding and deleteHolding modify and remove CNC holdings accurately', () => {
+  const { store, cleanup } = createTempStore();
+  try {
+    const initial = store.getPortfolio('KT8492');
+    assert.ok(initial && initial.holdings.length > 0);
+    const target = initial.holdings[0];
+
+    const updated = store.updateHolding('KT8492', target.token, 25, 1400.5);
+    assert.equal(updated.ok, true);
+    if (updated.ok) {
+      const h = updated.portfolio.holdings.find((item) => item.token === target.token);
+      assert.ok(h);
+      assert.equal(h.quantity, 25);
+      assert.equal(h.averagePrice, 1400.5);
+      assert.equal(h.investedValue, 35012.5);
+    }
+
+    assert.equal(store.updateHolding('KT8492', target.token, 0, 1400).ok, false);
+
+    const deleted = store.deleteHolding('KT8492', target.token);
+    assert.equal(deleted.ok, true);
+    if (deleted.ok) {
+      assert.equal(
+        deleted.portfolio.holdings.some((item) => item.token === target.token),
+        false,
+      );
+    }
+  } finally {
+    cleanup();
+  }
+});
+
+

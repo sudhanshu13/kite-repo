@@ -31,9 +31,10 @@ export function OrderModal({
   onClose,
   onSubmitOrder,
 }: OrderModalProps) {
+  const isDerivative = instrument.exchange === 'NFO' || instrument.exchange === 'BFO';
   const [side, setSide] = useState<OrderSide>(initialSide);
   const [product, setProduct] = useState<ProductType>(
-    instrument.exchange === 'NFO' ? 'NRML' : 'CNC',
+    isDerivative ? 'NRML' : 'CNC',
   );
   const [orderType, setOrderType] = useState<OrderType>('MARKET');
   const [quantityStr, setQuantityStr] = useState<string>(
@@ -225,7 +226,7 @@ export function OrderModal({
               Product
             </span>
             <div className="grid grid-cols-2 gap-2.5">
-              {(instrument.exchange === 'NFO'
+              {(isDerivative
                 ? (['NRML', 'MIS'] as ProductType[])
                 : (['CNC', 'MIS'] as ProductType[])
               ).map((p) => (

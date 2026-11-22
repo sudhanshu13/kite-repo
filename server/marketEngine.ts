@@ -1,3 +1,4 @@
+import { priceOptionBlackScholes } from '../shared/derivatives.ts';
 import { round2, roundTick, type ParsedLiveQuoteSnapshot } from '../shared/liveQuoteParser.ts';
 import { evaluateTechnicalSummary } from '../shared/technicals.ts';
 import type {
@@ -60,25 +61,69 @@ export class MarketEngine {
   private seedFallbackMarket() {
     const now = Date.now();
     INSTRUMENTS.forEach((inst, idx) => {
+      const isOption = inst.instrumentType === 'CE' || inst.instrumentType === 'PE';
       const bias = ((idx % 5) - 2) * 0.00025;
       this.biases.set(inst.token, bias);
 
-      const history: number[] = [];
-      let p = inst.basePrice * (1 - bias * 60);
-      for (let i = 0; i < 220; i++) {
-        const wave = Math.sin((i + idx * 7) * 0.19) * 0.0012;
-        const drift = bias + Math.cos((i + idx) * 0.07) * 0.0005;
-        p = Math.max(inst.tickSize, p * (1 + drift + wave));
-        history.push(roundTick(p, inst.tickSize));
+      let ltp: number;
+      let prevClose: number;
+      let open: number;
+      let high: number;
+      let low: number;
+      let history: number[];
+
+      if (isOption && inst.derivedFromToken && this.quotes.has(inst.derivedFromToken)) {
+        const spotQuote = this.quotes.get(inst.derivedFromToken)!;
+        const spotHist = this.priceHistory.get(inst.derivedFromToken) ?? [spotQuote.ltp];
+        const side = inst.instrumentType === 'PE' ? 'PE' : 'CE';
+        const strike = inst.strike ?? spotQuote.ltp;
+        const dte = inst.daysToExpiry ?? 7;
+        const iv = inst.optionIv ?? 0.15;
+        const priceAt = (s: number) =>
+          priceOptionBlackScholes({
+            spot: s,
+            strike,
+            daysToExpiry: dte,
+            iv,
+            optionType: side,
+            tickSize: inst.tickSize,
+          });
+
+        ltp = priceAt(spotQuote.ltp);
+        prevClose = priceAt(spotQuote.close);
+        open = priceAt(spotQuote.open);
+        const pH = priceAt(spotQuote.high);
+        const pL = priceAt(spotQuote.low);
+        high = Math.max(ltp, open, pH, pL);
+        low = Math.max(inst.tickSize, Math.min(ltp, open, pH, pL));
+
+        const stride = Math.max(1, Math.floor(spotHist.length / 55));
+        history = [];
+        for (let i = 0; i < spotHist.length; i += stride) {
+          history.push(priceAt(spotHist[i]));
+        }
+        if (history.length === 0 || history[history.length - 1] !== ltp) {
+          history.push(ltp);
+        }
+      } else {
+        history = [];
+        let p = inst.basePrice * (1 - bias * 60);
+        for (let i = 0; i < 220; i++) {
+          const wave = Math.sin((i + idx * 7) * 0.19) * 0.0012;
+          const drift = bias + Math.cos((i + idx) * 0.07) * 0.0005;
+          p = Math.max(inst.tickSize, p * (1 + drift + wave));
+          history.push(roundTick(p, inst.tickSize));
+        }
+
+        ltp = roundTick(inst.basePrice, inst.tickSize);
+        prevClose = roundTick(history[history.length - 18] || ltp, inst.tickSize);
+        open = roundTick(history[history.length - 12] || prevClose, inst.tickSize);
+        history[history.length - 1] = ltp;
+
+        high = Math.max(open, ltp, prevClose);
+        low = Math.min(open, ltp, prevClose);
       }
 
-      const ltp = roundTick(inst.basePrice, inst.tickSize);
-      const prevClose = roundTick(history[history.length - 18] || ltp, inst.tickSize);
-      const open = roundTick(history[history.length - 12] || prevClose, inst.tickSize);
-      history[history.length - 1] = ltp;
-
-      const high = Math.max(open, ltp, prevClose);
-      const low = Math.min(open, ltp, prevClose);
       const change = round2(ltp - prevClose);
       const changePercent = prevClose > 0 ? round2((change / prevClose) * 100) : 0;
 
@@ -94,13 +139,17 @@ export class MarketEngine {
         close: prevClose,
         change,
         changePercent,
-        volume: inst.isIndex ? 0 : Math.floor(450000 + idx * 135000),
+        volume: inst.isIndex
+          ? 0
+          : isOption
+            ? Math.max(inst.lotSize * 20, Math.floor(125000 + (idx % 17) * 32000))
+            : Math.floor(450000 + idx * 135000),
         averagePrice: roundTick((high + low + ltp) / 3, inst.tickSize),
-        lastQty: inst.isIndex ? 0 : (idx % 9) * 5 + 3,
-        lowerCircuit: roundTick(prevClose * 0.9, inst.tickSize),
-        upperCircuit: roundTick(prevClose * 1.1, inst.tickSize),
+        lastQty: inst.isIndex ? 0 : Math.max(inst.lotSize, (idx % 9) * inst.lotSize),
+        lowerCircuit: roundTick(prevClose * (isOption ? 0.05 : 0.9), inst.tickSize),
+        upperCircuit: roundTick(prevClose * (isOption ? 2.5 : 1.1), inst.tickSize),
         week52High: roundTick(ltp * 1.18, inst.tickSize),
-        week52Low: roundTick(ltp * 0.76, inst.tickSize),
+        week52Low: Math.max(inst.tickSize, roundTick(ltp * 0.76, inst.tickSize)),
         timestamp: now,
         direction: change >= 0 ? 'up' : 'down',
         depth: inst.isIndex ? { buy: [], sell: [] } : buildDepth(ltp, inst.tickSize, idx + 11),
@@ -202,11 +251,13 @@ export class MarketEngine {
       }
       const now = Date.now();
       const depthUpdated: MarketQuote[] = [];
-      for (const inst of INSTRUMENTS) {
-        if (inst.isIndex) continue;
-        if ((inst.token + this.tickCounter) % 3 !== 0) continue;
+      INSTRUMENTS.forEach((inst, idx) => {
+        if (inst.isIndex) return;
+        const isOption = inst.instrumentType === 'CE' || inst.instrumentType === 'PE';
+        const modulus = isOption ? 24 : 3;
+        if ((idx + this.tickCounter) % modulus !== 0) return;
         const prev = this.quotes.get(inst.token);
-        if (!prev) continue;
+        if (!prev) return;
         const nextQuote: MarketQuote = {
           ...prev,
           timestamp: now,
@@ -214,7 +265,7 @@ export class MarketEngine {
         };
         this.quotes.set(inst.token, nextQuote);
         depthUpdated.push(nextQuote);
-      }
+      });
       return depthUpdated;
     }
 
@@ -222,25 +273,47 @@ export class MarketEngine {
     const now = Date.now();
     const updated: MarketQuote[] = [];
 
-    for (const inst of INSTRUMENTS) {
-      const shouldStep =
-        inst.isIndex || (inst.token + this.tickCounter) % 2 === 0;
-      if (!shouldStep) continue;
+    INSTRUMENTS.forEach((inst, idx) => {
+      const isOption = inst.instrumentType === 'CE' || inst.instrumentType === 'PE';
+      const isFuture = inst.instrumentType === 'FUT';
+      const shouldStep = isOption
+        ? (idx + this.tickCounter) % 24 === 0
+        : isFuture
+          ? (idx + this.tickCounter) % 4 === 0
+          : inst.isIndex || (inst.token + this.tickCounter) % 2 === 0;
+      if (!shouldStep) return;
 
       const prev = this.quotes.get(inst.token);
-      if (!prev) continue;
+      if (!prev) return;
 
-      const bias = this.biases.get(inst.token) ?? 0;
-      const meanPull = ((inst.basePrice - prev.ltp) / inst.basePrice) * 0.015;
-      const noise = (Math.random() - 0.5) * 0.0028;
-      const pctMove = bias * 0.35 + meanPull + noise;
+      let nextLtp: number;
+      if (isOption && inst.derivedFromToken && this.quotes.has(inst.derivedFromToken)) {
+        const spot = this.quotes.get(inst.derivedFromToken)!.ltp;
+        nextLtp = priceOptionBlackScholes({
+          spot,
+          strike: inst.strike ?? spot,
+          daysToExpiry: inst.daysToExpiry ?? 7,
+          iv: inst.optionIv ?? 0.15,
+          optionType: inst.instrumentType === 'PE' ? 'PE' : 'CE',
+          tickSize: inst.tickSize,
+        });
+      } else if (isFuture && inst.derivedFromToken && this.quotes.has(inst.derivedFromToken)) {
+        const spot = this.quotes.get(inst.derivedFromToken)!.ltp;
+        const basisFactor = 1 + (inst.futuresBasisBps ?? 25) / 10000;
+        nextLtp = roundTick(spot * basisFactor, inst.tickSize);
+      } else {
+        const bias = this.biases.get(inst.token) ?? 0;
+        const meanPull = ((inst.basePrice - prev.ltp) / inst.basePrice) * 0.015;
+        const noise = (Math.random() - 0.5) * 0.0028;
+        const pctMove = bias * 0.35 + meanPull + noise;
 
-      let nextLtp = roundTick(
-        Math.max(inst.tickSize, prev.ltp * (1 + pctMove)),
-        inst.tickSize,
-      );
-      if (nextLtp < prev.lowerCircuit) nextLtp = prev.lowerCircuit;
-      if (nextLtp > prev.upperCircuit) nextLtp = prev.upperCircuit;
+        nextLtp = roundTick(
+          Math.max(inst.tickSize, prev.ltp * (1 + pctMove)),
+          inst.tickSize,
+        );
+        if (nextLtp < prev.lowerCircuit) nextLtp = prev.lowerCircuit;
+        if (nextLtp > prev.upperCircuit) nextLtp = prev.upperCircuit;
+      }
 
       const direction: 'up' | 'down' | 'flat' =
         nextLtp > prev.ltp ? 'up' : nextLtp < prev.ltp ? 'down' : 'flat';
@@ -250,7 +323,9 @@ export class MarketEngine {
       const change = round2(nextLtp - prev.close);
       const changePercent =
         prev.close > 0 ? round2((change / prev.close) * 100) : 0;
-      const addedQty = inst.isIndex ? 0 : Math.floor(Math.random() * 140) + 1;
+      const addedQty = inst.isIndex
+        ? 0
+        : Math.max(inst.lotSize, (Math.floor(Math.random() * 5) + 1) * inst.lotSize);
 
       const nextQuote: MarketQuote = {
         ...prev,
@@ -277,7 +352,7 @@ export class MarketEngine {
       this.priceHistory.set(inst.token, history);
 
       updated.push(nextQuote);
-    }
+    });
 
     return updated;
   }

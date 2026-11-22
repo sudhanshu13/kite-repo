@@ -686,6 +686,40 @@ export default function App() {
     }
   }
 
+  async function handleUpdateHolding(
+    token: number,
+    quantity: number,
+    averagePrice: number,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const res = await apiFetch(`/api/holdings/${token}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quantity, averagePrice }),
+    });
+    const data = (await res.json()) as { portfolio?: PortfolioState; error?: string };
+    if (!res.ok || !data.portfolio) {
+      return { ok: false, error: data.error || 'Failed to update holding.' };
+    }
+    setPortfolio(data.portfolio);
+    pushToast('Holding updated.');
+    return { ok: true };
+  }
+
+  async function handleDeleteHolding(
+    token: number,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const res = await apiFetch(`/api/holdings/${token}`, {
+      method: 'DELETE',
+    });
+    const data = (await res.json()) as { portfolio?: PortfolioState; error?: string };
+    if (!res.ok || !data.portfolio) {
+      return { ok: false, error: data.error || 'Failed to delete holding.' };
+    }
+    setPortfolio(data.portfolio);
+    pushToast('Holding removed from portfolio.');
+    return { ok: true };
+  }
+
   async function handleAddFunds(
     amount: number,
   ): Promise<{ ok: boolean; error?: string }> {
@@ -880,6 +914,8 @@ export default function App() {
                 quotes={quotes}
                 onOpenOrderModal={(token, side) => setOrderModal({ token, side })}
                 onSelectSymbolForTechnicals={handleSelectSymbolForTechnicals}
+                onUpdateHolding={handleUpdateHolding}
+                onDeleteHolding={handleDeleteHolding}
                 onNotify={pushToast}
               />
             )}
