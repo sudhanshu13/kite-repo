@@ -28,7 +28,7 @@ import type {
   OrderSide,
   ProductType,
 } from '../../shared/types.ts';
-import { formatPrice, formatSigned, getChangeColorClass } from '../utils/format.ts';
+import { formatPrice, getChangeColorClass } from '../utils/format.ts';
 import { KiteLogo } from './KiteLogo.tsx';
 import type { WorkspaceConfig } from './TerminalView.tsx';
 
@@ -273,46 +273,46 @@ export function TopBar({
     >
       <header
         data-testid="kite-header"
-        className="h-[50px] w-full max-w-[1280px] mx-auto flex items-center justify-between"
+        className="h-[50px] w-full max-w-[1280px] min-[1560px]:max-w-[1380px] min-[1760px]:max-w-[1536px] mx-auto flex items-center justify-between"
       >
         {/* Left Zone: Indices aligned over MarketWatch rail */}
-        <div className="hidden lg:flex items-center justify-between lg:w-[375px] xl:w-[385px] shrink-0 h-full px-3.5 border-r border-[#EEEEEE] dark:border-[#282828] text-[11.5px]">
-          <div className="flex items-center gap-1.5 whitespace-nowrap">
-            <span className="font-semibold text-[#444444] dark:text-[#E0E0E0] tracking-tight">
+        <div className="hidden lg:flex items-center justify-between gap-2 lg:w-[375px] xl:w-[400px] min-[1760px]:w-[432px] shrink-0 h-full px-3 min-[1760px]:px-3.5 border-r border-[#EEEEEE] dark:border-[#282828] overflow-hidden">
+          <div className="flex items-center gap-1 whitespace-nowrap min-w-0">
+            <span className="text-[11px] font-semibold text-[#444444] dark:text-[#E0E0E0] tracking-[-0.01em]">
               NIFTY 50
             </span>
             <span
-              className={`font-mono-num font-semibold ${getChangeColorClass(niftyQuote?.change ?? 0)}`}
+              className={`font-mono-num text-[11px] font-semibold ${getChangeColorClass(niftyQuote?.change ?? 0)}`}
             >
-              {niftyQuote ? formatPrice(niftyQuote.ltp) : '—'}
+              {niftyQuote ? niftyQuote.ltp.toFixed(2) : '—'}
             </span>
-            <span className="font-mono-num text-[11px] text-[#9B9B9B] dark:text-[#8C8C8C]">
+            <span className="font-mono-num text-[10px] text-[#9B9B9B] dark:text-[#8C8C8C]">
               {niftyQuote
-                ? `${formatSigned(niftyQuote.change)} (${niftyQuote.changePercent >= 0 ? '+' : ''}${niftyQuote.changePercent.toFixed(2)}%)`
+                ? `${niftyQuote.change.toFixed(2)} (${niftyQuote.changePercent.toFixed(2)}%)`
                 : ''}
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 whitespace-nowrap">
-            <span className="font-semibold text-[#444444] dark:text-[#E0E0E0] tracking-tight">
+          <div className="flex items-center gap-1 whitespace-nowrap min-w-0">
+            <span className="text-[11px] font-semibold text-[#444444] dark:text-[#E0E0E0] tracking-[-0.01em]">
               SENSEX
             </span>
             <span
-              className={`font-mono-num font-semibold ${getChangeColorClass(sensexQuote?.change ?? 0)}`}
+              className={`font-mono-num text-[11px] font-semibold ${getChangeColorClass(sensexQuote?.change ?? 0)}`}
             >
-              {sensexQuote ? formatPrice(sensexQuote.ltp) : '—'}
+              {sensexQuote ? sensexQuote.ltp.toFixed(2) : '—'}
             </span>
-            <span className="font-mono-num text-[11px] text-[#9B9B9B] dark:text-[#8C8C8C] hidden xl:inline">
+            <span className="font-mono-num text-[10px] text-[#9B9B9B] dark:text-[#8C8C8C] hidden xl:inline">
               {sensexQuote
-                ? `${sensexQuote.changePercent >= 0 ? '+' : ''}${sensexQuote.changePercent.toFixed(2)}%`
+                ? `${sensexQuote.change.toFixed(2)} (${sensexQuote.changePercent.toFixed(2)}%)`
                 : ''}
             </span>
           </div>
         </div>
 
         {/* Right Zone: Kite Logo + Joined Workspace/Terminal Selector on Left, Exact Kite Menu + Cart + Bell + Profile on Right */}
-        <div className="flex-1 flex items-center justify-between gap-3 px-4 lg:px-6 min-w-0 h-full">
-          <div className="flex items-center gap-3.5 xl:gap-4 min-w-0">
+        <div className="flex-1 flex items-center justify-between gap-3 px-4 lg:px-5 min-[1760px]:px-7 min-w-0 h-full">
+          <div className="flex items-center gap-3.5 min-[1760px]:gap-5 min-w-0 shrink-0">
             <button
               type="button"
               onClick={() => {
@@ -330,14 +330,14 @@ export function TopBar({
             </button>
 
             {/* Kite-style Joined Workspace Dropdown + Terminal Grid Icon */}
-            <div className="relative hidden lg:flex items-center h-[32px] border border-[#EEEEEE] dark:border-[#303030] rounded-[3px] bg-white dark:bg-[#1E1E1E]">
+            <div className="relative hidden lg:flex items-center h-[32px] border border-[#EAEAEA] dark:border-[#303030] rounded-[3px] bg-white dark:bg-[#1E1E1E]">
               <button
                 type="button"
                 onClick={() => toggleMenu('workspace')}
                 aria-expanded={openMenu === 'workspace'}
                 aria-haspopup="menu"
                 aria-label="Select workspace"
-                className="h-full min-w-[126px] xl:min-w-[144px] px-3 flex items-center justify-between gap-2 text-[12.5px] font-normal text-[#444444] dark:text-[#E0E0E0] hover:bg-[#FAFAFA] dark:hover:bg-[#252525] border-r border-[#EEEEEE] dark:border-[#303030] cursor-pointer transition-colors"
+                className="h-full min-w-[116px] xl:min-w-[126px] min-[1760px]:min-w-[158px] px-3 flex items-center justify-between gap-2 text-[12px] font-normal text-[#444444] dark:text-[#E0E0E0] hover:bg-[#FAFAFA] dark:hover:bg-[#252525] border-r border-[#EAEAEA] dark:border-[#303030] cursor-pointer transition-colors"
               >
                 <span className="truncate">{activeWorkspace?.name ?? 'Default'}</span>
                 <ChevronDown
@@ -479,11 +479,13 @@ export function TopBar({
           </div>
 
           {/* Right-Aligned Kite Menu Items + Cart + Bell + User Avatar/ID */}
-          <div className="flex items-center gap-3.5 xl:gap-4 ml-auto min-w-0 h-full">
+          <div className="flex items-center gap-3.5 xl:gap-5 min-[1760px]:gap-6 ml-auto min-w-0 h-full">
             <nav
               aria-label="Primary sections"
               className={`hidden lg:flex items-center h-full ${
-                visibleNavItems.length > 6 ? 'gap-3.5 xl:gap-4' : 'gap-4 xl:gap-5'
+                visibleNavItems.length > 6
+                  ? 'gap-3 xl:gap-3.5 min-[1560px]:gap-4 min-[1760px]:gap-6'
+                  : 'gap-3.5 xl:gap-4 min-[1560px]:gap-5 min-[1760px]:gap-7'
               }`}
             >
               {visibleNavItems.map((item) => {
@@ -519,10 +521,8 @@ export function TopBar({
               })}
             </nav>
 
-            <div className="hidden lg:block h-4 w-px bg-[#EEEEEE] dark:bg-[#282828] shrink-0" />
-
             {/* Kite Utility Icons: Cart + Notifications Bell + User Avatar/ID */}
-            <div className="flex items-center gap-2.5 xl:gap-3 shrink-0">
+            <div className="flex items-center gap-2.5 xl:gap-3 min-[1760px]:gap-4 shrink-0">
               {/* Cart (Basket Orders) */}
               <div className="relative">
                 <button
@@ -791,11 +791,11 @@ export function TopBar({
                 >
                   <span
                     aria-hidden="true"
-                    className="w-[26px] h-[26px] rounded-full bg-[#ECE7FA] dark:bg-[#2A2636] text-[#7E57C2] dark:text-[#B39DDB] text-[10px] font-semibold inline-flex items-center justify-center shrink-0"
+                    className="w-[24px] h-[24px] rounded-full bg-[#F2EBF9] dark:bg-[#2A2636] text-[#A27CD1] dark:text-[#B39DDB] text-[9.5px] font-medium inline-flex items-center justify-center shrink-0"
                   >
                     {initials}
                   </span>
-                  <span className="font-mono-num text-[12px] font-normal text-[#444444] dark:text-[#E0E0E0] group-hover:text-[#FF5722] transition-colors">
+                  <span className="font-mono-num text-[12px] font-normal text-[#555555] dark:text-[#E0E0E0] group-hover:text-[#FF5722] transition-colors">
                     {user.userId}
                   </span>
                 </button>

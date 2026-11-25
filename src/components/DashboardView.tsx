@@ -103,19 +103,19 @@ export function DashboardView({
   }
 
   return (
-    <div className="max-w-[1160px]">
+    <div className="w-full">
       {/* Top Two-Tab Bar: Dashboard | Stock screener */}
-      <div className="px-5 lg:px-9 border-b border-[#EEEEEE] dark:border-[#282828] flex items-center gap-7">
+      <div className="px-5 lg:px-8 border-b border-[#EEEEEE] dark:border-[#282828] flex items-center gap-7">
         <div role="tablist" aria-label="Dashboard sections" className="flex items-center gap-7">
           <button
             type="button"
             role="tab"
             aria-selected={subTab === 'dashboard'}
             onClick={() => setSubTab('dashboard')}
-            className={`relative py-3.5 text-[13px] transition-colors cursor-pointer ${
+            className={`relative py-3 text-[12.5px] transition-colors cursor-pointer ${
               subTab === 'dashboard'
                 ? 'text-[#FF5722] font-normal'
-                : 'text-[#666666] dark:text-[#A0A0A0] hover:text-[#FF5722]'
+                : 'text-[#444444] dark:text-[#A0A0A0] hover:text-[#FF5722]'
             }`}
           >
             <span>Dashboard</span>
@@ -132,10 +132,10 @@ export function DashboardView({
             role="tab"
             aria-selected={subTab === 'screener'}
             onClick={() => setSubTab('screener')}
-            className={`relative py-3.5 text-[13px] transition-colors cursor-pointer ${
+            className={`relative py-3 text-[12.5px] transition-colors cursor-pointer ${
               subTab === 'screener'
                 ? 'text-[#FF5722] font-normal'
-                : 'text-[#666666] dark:text-[#A0A0A0] hover:text-[#FF5722]'
+                : 'text-[#444444] dark:text-[#A0A0A0] hover:text-[#FF5722]'
             }`}
           >
             <span>Stock screener</span>
@@ -150,7 +150,7 @@ export function DashboardView({
       </div>
 
       {/* Tab Content Area */}
-      <div className="p-5 lg:p-9">
+      <div className="px-5 py-6 lg:px-8 lg:py-7">
         {subTab === 'screener' ? (
           <StockScreenerView
             instruments={instruments}
@@ -162,7 +162,7 @@ export function DashboardView({
           <div className="space-y-8">
             {/* Greeting Header */}
             <div className="pb-5 border-b border-[#EEEEEE] dark:border-[#282828]">
-              <h1 className="text-[24px] font-normal text-[#444444] dark:text-[#E0E0E0] tracking-tight">
+              <h1 className="text-[24px] font-normal text-[#444444] dark:text-[#E0E0E0] tracking-[-0.015em]">
                 Hi, {portfolio.userName.split(' ')[0]}
               </h1>
             </div>
@@ -177,8 +177,8 @@ export function DashboardView({
                 </div>
 
                 <div className="flex items-start gap-7">
-                  <div className="min-w-[145px]">
-                    <div className="text-[36px] leading-[1.15] font-light tabular-nums text-[#444444] dark:text-[#F0F0F0] tracking-tight">
+                  <div className="min-w-[168px]">
+                    <div className="text-[32px] leading-[1.15] font-light tabular-nums text-[#444444] dark:text-[#F0F0F0] tracking-[-0.02em]">
                       {formatINR(portfolio.availableCash)}
                     </div>
                     <div className="text-[12px] text-[#9B9B9B] mt-2">Margin available</div>
@@ -219,8 +219,8 @@ export function DashboardView({
                 </div>
 
                 <div className="flex items-start gap-7">
-                  <div className="min-w-[145px]">
-                    <div className="text-[36px] leading-[1.15] font-light tabular-nums text-[#444444] dark:text-[#F0F0F0] tracking-tight">
+                  <div className="min-w-[168px]">
+                    <div className="text-[32px] leading-[1.15] font-light tabular-nums text-[#444444] dark:text-[#F0F0F0] tracking-[-0.02em]">
                       0
                     </div>
                     <div className="text-[12px] text-[#9B9B9B] mt-2">Margin available</div>

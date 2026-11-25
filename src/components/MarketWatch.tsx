@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   Activity,
   BarChart2,
+  Briefcase,
   ChevronDown,
   ChevronRight,
   ChevronUp,
   FolderInput,
+  Layers,
   Loader2,
   Plus,
   Search,
@@ -18,6 +20,7 @@ import {
   type SearchCategoryFilter,
 } from '../../shared/derivatives.ts';
 import type {
+  Holding,
   Instrument,
   MarketQuote,
   OrderSide,
@@ -30,6 +33,7 @@ interface MarketWatchProps {
   instruments: Instrument[];
   quotes: Record<number, MarketQuote>;
   signals: WatchlistSignalsMap;
+  holdings?: Holding[];
   watchlists: Record<string, number[]>;
   activeWatchlistId: string;
   selectedToken: number;
@@ -131,6 +135,7 @@ export function MarketWatch({
   instruments,
   quotes,
   signals,
+  holdings = [],
   watchlists,
   activeWatchlistId,
   selectedToken,
@@ -175,6 +180,14 @@ export function MarketWatch({
     for (const inst of instruments) m.set(inst.token, inst);
     return m;
   }, [instruments]);
+
+  const holdingQtyByToken = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const h of holdings) {
+      if (h.quantity > 0) map.set(h.token, h.quantity);
+    }
+    return map;
+  }, [holdings]);
 
   // Global Ctrl+K / Cmd+K shortcut to focus MarketWatch search
   useEffect(() => {
@@ -426,12 +439,12 @@ export function MarketWatch({
   return (
     <aside
       aria-label="Marketwatch"
-      className="w-full lg:w-[375px] xl:w-[385px] shrink-0 bg-[#FFFFFF] dark:bg-[#141414] border-b lg:border-b-0 lg:border-r border-[#EEEEEE] dark:border-[#282828] flex flex-col lg:h-full"
+      className="w-full lg:w-[375px] xl:w-[400px] min-[1760px]:w-[432px] shrink-0 bg-[#FFFFFF] dark:bg-[#141414] border-b lg:border-b-0 lg:border-r border-[#EEEEEE] dark:border-[#282828] flex flex-col lg:h-full"
     >
       {/* Top Bordered Search Box (Exact Kite Style with Ctrl+K & Filter Sliders) */}
-      <div ref={searchContainerRef} className="relative px-3 pt-2.5 pb-1.5">
-        <div className="flex items-center h-[38px] bg-white dark:bg-[#1A1A1A] border border-[#E5E5E5] dark:border-[#2F2F2F] rounded-[3px] shadow-[0_1px_2px_rgba(0,0,0,0.02)] focus-within:border-[#4184F3]">
-          <div className="w-9 h-full flex items-center justify-center border-r border-[#F0F0F0] dark:border-[#2A2A2A] text-[#9B9B9B] shrink-0">
+      <div ref={searchContainerRef} className="relative px-3.5 pt-3 pb-1.5">
+        <div className="flex items-center h-[38px] bg-white dark:bg-[#1A1A1A] border border-[#EBEBEB] dark:border-[#2F2F2F] rounded-[3px] shadow-[0_1px_2px_rgba(0,0,0,0.015)] focus-within:border-[#4184F3]">
+          <div className="pl-3 pr-1.5 h-full flex items-center justify-center text-[#9B9B9B] shrink-0">
             <Search className="w-3.5 h-3.5" />
           </div>
 
@@ -445,8 +458,8 @@ export function MarketWatch({
               setSearchQuery(e.target.value);
               setSearchFocused(true);
             }}
-            placeholder="Search eg: infy bse, nifty fut, index fund, et..."
-            className="flex-1 min-w-0 px-2.5 text-[12px] bg-transparent focus:outline-none text-[#444444] dark:text-[#E0E0E0] placeholder:text-[#9B9B9B]"
+            placeholder="Search eg: infy bse, nifty fut, index fund, et"
+            className="flex-1 min-w-0 pr-2 text-[12px] bg-transparent focus:outline-none text-[#444444] dark:text-[#E0E0E0] placeholder:text-[#9B9B9B]"
           />
 
           {searchQuery ? (
@@ -733,27 +746,27 @@ export function MarketWatch({
       )}
 
       {/* Grouped Watchlist Boxes */}
-      <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-2.5">
+      <div className="flex-1 overflow-y-auto px-3.5 pb-3 space-y-2.5">
         {groups.map((group) => {
           const isCollapsed = !!collapsedGroups[group.id];
           return (
             <section
               key={group.id}
               aria-label={`${group.name} group`}
-              className="border border-[#EBEBEB] dark:border-[#2A2A2A] rounded-[4px] bg-white dark:bg-[#181818] shadow-[0_1px_2px_rgba(0,0,0,0.02)] overflow-hidden"
+              className="border border-[#EAEAEA] dark:border-[#2A2A2A] rounded-[3px] bg-white dark:bg-[#181818] overflow-hidden"
             >
-              {/* Warm Cream Group Header */}
-              <div className="group/hdr flex items-center justify-between px-3 py-2 bg-[#FAF7F2] dark:bg-[#201E1B] border-b border-[#EFEFEF] dark:border-[#2B2B2B]">
+              {/* Neutral Kite Group Header */}
+              <div className="group/hdr flex items-center justify-between px-3 py-2 bg-[#F7F7F7] dark:bg-[#1D1D1D] border-b border-[#EFEFEF] dark:border-[#2B2B2B]">
                 <button
                   type="button"
                   onClick={() => toggleGroupCollapse(group.id)}
                   aria-expanded={!isCollapsed}
                   className="flex items-center gap-1.5 text-left min-w-0 cursor-pointer"
                 >
-                  <span className="text-[12.5px] font-medium text-[#222222] dark:text-[#E8E8E8] truncate">
+                  <span className="text-[12px] font-semibold text-[#444444] dark:text-[#E8E8E8] truncate">
                     {group.name}
                   </span>
-                  <span className="text-[12px] font-normal text-[#888888] dark:text-[#9A9A9A] tabular-nums">
+                  <span className="text-[11.5px] font-normal text-[#9B9B9B] dark:text-[#9A9A9A] tabular-nums">
                     ({group.tokens.length})
                   </span>
                 </button>
@@ -827,13 +840,15 @@ export function MarketWatch({
                       const flash = flashMap[token];
                       const signal = signals[token] ?? 'Neutral';
                       const changeColor = getChangeColorClass(q.change);
+                      const holdingQty = holdingQtyByToken.get(token) ?? 0;
                       const exchangeLabel =
-                        inst.exchange === 'INDICES' ? 'INDEX' : inst.exchange;
-                      const absChangeText =
-                        q.change < 0
-                          ? q.change.toFixed(2)
-                          : q.change.toFixed(2);
-                      const pctText = `${q.changePercent < 0 ? '' : ''}${q.changePercent.toFixed(2)}%`;
+                        inst.exchange === 'INDICES'
+                          ? 'INDEX'
+                          : inst.exchange === 'NSE'
+                            ? ''
+                            : inst.exchange;
+                      const absChangeText = q.change.toFixed(2);
+                      const pctText = `${q.changePercent.toFixed(2)}%`;
 
                       return (
                         <div
@@ -846,12 +861,12 @@ export function MarketWatch({
                                 : ''
                           } ${
                             isSelected
-                              ? 'bg-[#F6F8FB] dark:bg-[#222222]'
+                              ? 'bg-[#FAFAFA] dark:bg-[#222222]'
                               : 'hover:bg-[#FAFAFA] dark:hover:bg-[#1E1E1E]'
                           }`}
                         >
-                          <div className="relative px-3.5 py-2.5 flex items-center justify-between gap-2">
-                            {/* Left: Symbol + tiny Exchange Tag */}
+                          <div className="relative px-3.5 py-[11px] flex items-center justify-between gap-2">
+                            {/* Left: Symbol (+ Exchange badge only for non-NSE) */}
                             <button
                               type="button"
                               onClick={() => onSelectSymbolForTechnicals(token)}
@@ -859,7 +874,7 @@ export function MarketWatch({
                             >
                               <div className="flex items-baseline gap-1.5 min-w-0">
                                 <span
-                                  className={`text-[13px] font-normal truncate ${
+                                  className={`text-[12.5px] font-normal truncate ${
                                     q.change < 0
                                       ? 'text-[#DF514C] dark:text-[#F87171]'
                                       : q.change > 0
@@ -869,9 +884,11 @@ export function MarketWatch({
                                 >
                                   {inst.symbol}
                                 </span>
-                                <span className="text-[9.5px] text-[#9B9B9B] uppercase tracking-wide shrink-0">
-                                  {exchangeLabel}
-                                </span>
+                                {exchangeLabel && (
+                                  <span className="text-[9.5px] text-[#9B9B9B] uppercase tracking-wide shrink-0">
+                                    {exchangeLabel}
+                                  </span>
+                                )}
                               </div>
                               {showTechnicalsTag && (
                                 <div className="text-[10.5px] mt-0.5 flex items-center gap-1 text-[#9B9B9B]">
@@ -884,19 +901,28 @@ export function MarketWatch({
                               )}
                             </button>
 
-                            {/* Right: Kite Compact Change + % + Chevron + LTP */}
+                            {/* Right: Kite Holding Qty + Briefcase + Change + % + Chevron + LTP */}
                             <div className="flex items-center gap-2.5 shrink-0 tabular-nums group-hover:opacity-0 transition-opacity">
-                              <span className="text-[12px] text-[#9B9B9B] dark:text-[#8C8C8C] hidden sm:inline">
+                              {holdingQty > 0 && (
+                                <span
+                                  title={`Holding: ${holdingQty} qty`}
+                                  className="inline-flex items-center gap-1 text-[11px] text-[#9B9B9B] dark:text-[#8C8C8C]"
+                                >
+                                  <span>{holdingQty}</span>
+                                  <Briefcase className="w-3 h-3 stroke-[1.6] text-[#A8A8A8]" />
+                                </span>
+                              )}
+                              <span className="text-[11.5px] text-[#9B9B9B] dark:text-[#8C8C8C] hidden sm:inline">
                                 {absChangeText}
                               </span>
-                              <span className="text-[12px] text-[#444444] dark:text-[#CFCFCF]">
+                              <span className="text-[11.5px] text-[#444444] dark:text-[#CFCFCF]">
                                 {pctText}
                               </span>
-                              <span className={`flex items-center gap-1 text-[13px] font-normal ${changeColor}`}>
+                              <span className={`flex items-center gap-1 text-[12.5px] font-normal min-w-[66px] justify-end ${changeColor}`}>
                                 {q.change >= 0 ? (
-                                  <ChevronUp className="w-3.5 h-3.5 stroke-[1.75] shrink-0" />
+                                  <ChevronUp className="w-3 h-3 stroke-[1.75] shrink-0" />
                                 ) : (
-                                  <ChevronDown className="w-3.5 h-3.5 stroke-[1.75] shrink-0" />
+                                  <ChevronDown className="w-3 h-3 stroke-[1.75] shrink-0" />
                                 )}
                                 <span>{q.ltp.toFixed(2)}</span>
                               </span>
@@ -1074,13 +1100,13 @@ export function MarketWatch({
         })}
       </div>
 
-      {/* Bottom Watchlist Tabs 1..7 */}
+      {/* Bottom Watchlist Tabs 1..7 + Manage Layers Icon (Exact Kite Footer) */}
       <div
         role="tablist"
         aria-label="Watchlist groups"
-        className="h-9 border-t border-[#EEEEEE] dark:border-[#282828] bg-[#F9F9F9] dark:bg-[#121212] flex items-center justify-between px-1 shrink-0"
+        className="h-9 border-t border-[#EEEEEE] dark:border-[#282828] bg-[#FFFFFF] dark:bg-[#141414] flex items-center justify-between shrink-0"
       >
-        <div className="flex items-center w-full">
+        <div className="flex items-center h-full">
           {['1', '2', '3', '4', '5', '6', '7'].map((id) => {
             const active = activeWatchlistId === id;
             return (
@@ -1095,10 +1121,10 @@ export function MarketWatch({
                   setTargetGroupIdForAdd(null);
                   setCreatingGroup(false);
                 }}
-                className={`flex-1 h-9 text-xs tabular-nums font-medium transition-colors cursor-pointer relative ${
+                className={`w-[38px] sm:w-[40px] h-9 text-[12px] tabular-nums transition-colors cursor-pointer relative ${
                   active
-                    ? 'text-[#FF5722] bg-white dark:bg-[#181818]'
-                    : 'text-[#666666] dark:text-[#8C8C8C] hover:text-[#444444] dark:hover:text-[#E0E0E0]'
+                    ? 'text-[#FF5722] font-medium bg-[#FAFAFA] dark:bg-[#1E1E1E]'
+                    : 'text-[#666666] dark:text-[#8C8C8C] hover:text-[#444444] dark:hover:text-[#E0E0E0] font-normal'
                 }`}
               >
                 {id}
@@ -1109,6 +1135,16 @@ export function MarketWatch({
             );
           })}
         </div>
+
+        <button
+          type="button"
+          onClick={() => setCreatingGroup((prev) => !prev)}
+          aria-label="Manage watchlist groups"
+          title="New watchlist group"
+          className="h-9 px-3 flex items-center justify-center text-[#8C8C8C] hover:text-[#444444] dark:hover:text-[#E0E0E0] transition-colors cursor-pointer"
+        >
+          <Layers className="w-3.5 h-3.5" />
+        </button>
       </div>
     </aside>
   );

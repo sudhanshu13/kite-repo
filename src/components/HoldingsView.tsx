@@ -449,9 +449,9 @@ export function HoldingsView({
   const pnlParts = splitIndianNumber(totals.totalPnl);
 
   return (
-    <div className="max-w-[1160px]">
+    <div className="w-full">
       {/* Top Sub-Tab Bar: All | Equity | Mutual funds */}
-      <div className="px-5 lg:px-9 border-b border-[#EEEEEE] dark:border-[#282828]">
+      <div className="px-5 lg:px-8 border-b border-[#EEEEEE] dark:border-[#282828]">
         <div
           role="tablist"
           aria-label="Holdings categories"
@@ -466,10 +466,10 @@ export function HoldingsView({
                 role="tab"
                 aria-selected={isActive}
                 onClick={() => setActiveTab(tab.id)}
-                className={`relative py-3.5 text-[13px] transition-colors cursor-pointer whitespace-nowrap ${
+                className={`relative py-3 text-[12.5px] transition-colors cursor-pointer whitespace-nowrap ${
                   isActive
                     ? 'text-[#FF5722] font-normal'
-                    : 'text-[#666666] dark:text-[#A0A0A0] hover:text-[#FF5722]'
+                    : 'text-[#444444] dark:text-[#A0A0A0] hover:text-[#FF5722]'
                 }`}
               >
                 <span>{tab.label}</span>
@@ -486,11 +486,11 @@ export function HoldingsView({
       </div>
 
       {/* Main Holdings Content */}
-      <div className="p-5 lg:p-9 space-y-6">
+      <div className="px-5 py-5 lg:px-8 lg:py-6 space-y-5">
         {/* Toolbar Row: Holdings (N) + Filter Select | Search + Family + Analytics + Download */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <h1 className="text-[18px] font-normal text-[#444444] dark:text-[#E0E0E0]">
+          <div className="flex items-center gap-3.5">
+            <h1 className="text-[18px] font-normal text-[#444444] dark:text-[#E0E0E0] tracking-[-0.01em]">
               Holdings ({filteredRows.length})
             </h1>
 
@@ -519,7 +519,7 @@ export function HoldingsView({
           </div>
 
           <div className="flex flex-wrap items-center gap-4 text-[12px]">
-            <div className="relative w-36 sm:w-44">
+            <div className="relative w-32 sm:w-[136px]">
               <Search className="w-3.5 h-3.5 text-[#9B9B9B] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
@@ -560,36 +560,36 @@ export function HoldingsView({
           </div>
         </div>
 
-        {/* 4-Column Summary KPI Strip (Exact Screenshot Style with Small Decimals & Tinted % Pill) */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-2">
+        {/* 4-Column Summary KPI Strip (Exact Kite Font Size, Weight & Tinted % Pill) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-1 pb-2">
           <div>
             <div className="text-[12px] text-[#9B9B9B]">Total investment</div>
-            <div className="mt-1 tabular-nums text-[#444444] dark:text-[#E0E0E0] leading-tight">
-              <span className="text-[22px] font-normal">{invParts.whole}</span>
-              <span className="text-[13px] font-normal">{invParts.decimals}</span>
+            <div className="mt-1 tabular-nums text-[#444444] dark:text-[#E0E0E0] leading-tight tracking-[-0.01em]">
+              <span className="text-[20px] font-medium">{invParts.whole}</span>
+              <span className="text-[12px] font-medium">{invParts.decimals}</span>
             </div>
           </div>
 
           <div>
             <div className="text-[12px] text-[#9B9B9B]">Current value</div>
-            <div className="mt-1 tabular-nums text-[#444444] dark:text-[#E0E0E0] leading-tight">
-              <span className="text-[22px] font-normal">{curParts.whole}</span>
-              <span className="text-[13px] font-normal">{curParts.decimals}</span>
+            <div className="mt-1 tabular-nums text-[#444444] dark:text-[#E0E0E0] leading-tight tracking-[-0.01em]">
+              <span className="text-[20px] font-medium">{curParts.whole}</span>
+              <span className="text-[12px] font-medium">{curParts.decimals}</span>
             </div>
           </div>
 
           <div>
             <div className="text-[12px] text-[#9B9B9B]">Day&apos;s P&amp;L</div>
-            <div className="mt-1 flex items-baseline flex-wrap gap-2 tabular-nums leading-tight">
+            <div className="mt-1 flex items-baseline flex-wrap gap-1.5 tabular-nums leading-tight tracking-[-0.01em]">
               <span className={getChangeColorClass(totals.dayPnl)}>
-                <span className="text-[22px] font-normal">{dayParts.whole}</span>
-                <span className="text-[13px] font-normal">{dayParts.decimals}</span>
+                <span className="text-[20px] font-medium">{dayParts.whole}</span>
+                <span className="text-[12px] font-medium">{dayParts.decimals}</span>
               </span>
               <span
-                className={`text-[11px] font-medium px-1.5 py-0.5 rounded-[3px] ${
+                className={`text-[10.5px] font-medium px-1.5 py-[2px] rounded-[2px] ${
                   totals.dayPnl >= 0
-                    ? 'bg-[#EBF7EC] text-[#4CAF50] dark:bg-[#193320] dark:text-[#4ADE80]'
-                    : 'bg-[#FDECEC] text-[#DF514C] dark:bg-[#351B1B] dark:text-[#F87171]'
+                    ? 'bg-[#ECF7ED] text-[#4CAF50] dark:bg-[#193320] dark:text-[#4ADE80]'
+                    : 'bg-[#FCECEB] text-[#DF514C] dark:bg-[#351B1B] dark:text-[#F87171]'
                 }`}
               >
                 {totals.dayPnlPct >= 0 ? '+' : ''}
@@ -600,16 +600,16 @@ export function HoldingsView({
 
           <div>
             <div className="text-[12px] text-[#9B9B9B]">Total P&amp;L</div>
-            <div className="mt-1 flex items-baseline flex-wrap gap-2 tabular-nums leading-tight">
+            <div className="mt-1 flex items-baseline flex-wrap gap-1.5 tabular-nums leading-tight tracking-[-0.01em]">
               <span className={getChangeColorClass(totals.totalPnl)}>
-                <span className="text-[22px] font-normal">{pnlParts.whole}</span>
-                <span className="text-[13px] font-normal">{pnlParts.decimals}</span>
+                <span className="text-[20px] font-medium">{pnlParts.whole}</span>
+                <span className="text-[12px] font-medium">{pnlParts.decimals}</span>
               </span>
               <span
-                className={`text-[11px] font-medium px-1.5 py-0.5 rounded-[3px] ${
+                className={`text-[10.5px] font-medium px-1.5 py-[2px] rounded-[2px] ${
                   totals.totalPnl >= 0
-                    ? 'bg-[#EBF7EC] text-[#4CAF50] dark:bg-[#193320] dark:text-[#4ADE80]'
-                    : 'bg-[#FDECEC] text-[#DF514C] dark:bg-[#351B1B] dark:text-[#F87171]'
+                    ? 'bg-[#ECF7ED] text-[#4CAF50] dark:bg-[#193320] dark:text-[#4ADE80]'
+                    : 'bg-[#FCECEB] text-[#DF514C] dark:bg-[#351B1B] dark:text-[#F87171]'
                 }`}
               >
                 {totals.totalPnlPct >= 0 ? '+' : ''}
@@ -637,30 +637,36 @@ export function HoldingsView({
               <table className="w-full text-[13px] text-left border-collapse">
                 <thead>
                   <tr className="border-b border-[#EEEEEE] dark:border-[#282828] text-[12px] text-[#9B9B9B] dark:text-[#8C8C8C]">
-                    <th className="py-3 px-3 font-normal border-r border-[#F0F0F0] dark:border-[#262626] min-w-[180px]">
+                    <th className="py-3 px-2.5 lg:px-3 font-normal border-r border-[#F2F2F2] dark:border-[#262626] min-w-[130px]">
                       Instrument
                     </th>
-                    <th className="py-3 px-3 font-normal text-right">
+                    <th className="py-3 px-2.5 lg:px-3 font-normal text-right whitespace-nowrap">
                       {activeTab === 'mutual_funds' ? 'Units' : 'Qty.'}
                     </th>
-                    <th className="py-3 px-3 font-normal text-right whitespace-nowrap">
+                    <th className="py-3 px-2.5 lg:px-3 font-normal text-right whitespace-nowrap">
                       {activeTab === 'mutual_funds' ? 'Avg. NAV' : 'Avg. cost'}
                     </th>
-                    <th className="py-3 px-3 font-normal text-right border-r border-[#F0F0F0] dark:border-[#262626]">
+                    <th className="py-3 px-2.5 lg:px-3 font-normal text-right border-r border-[#F2F2F2] dark:border-[#262626] whitespace-nowrap">
                       {activeTab === 'mutual_funds' ? 'NAV' : 'LTP'}
                     </th>
-                    <th className="py-3 px-3 font-normal text-right">Invested</th>
-                    <th className="py-3 px-3 font-normal text-right whitespace-nowrap">Cur. val</th>
-                    <th className="py-3 px-3 font-normal text-right bg-[#FAFAFA] dark:bg-[#191919]">
+                    <th className="py-3 px-2.5 lg:px-3 font-normal text-right whitespace-nowrap">
+                      Invested
+                    </th>
+                    <th className="py-3 px-2.5 lg:px-3 font-normal text-right whitespace-nowrap">
+                      Cur. val
+                    </th>
+                    <th className="py-3 px-2.5 lg:px-3 font-normal text-right bg-[#FAFAFA] dark:bg-[#191919] whitespace-nowrap">
                       P&amp;L
                     </th>
-                    <th className="py-3 px-3 font-normal text-right whitespace-nowrap">Net chg.</th>
-                    <th className="py-3 px-3 font-normal text-right whitespace-nowrap pr-9">
+                    <th className="py-3 px-2.5 lg:px-3 font-normal text-right whitespace-nowrap">
+                      Net chg.
+                    </th>
+                    <th className="py-3 px-2.5 lg:px-3 font-normal text-right whitespace-nowrap">
                       Day chg.
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#F0F0F0] dark:divide-[#242424]">
+                <tbody className="divide-y divide-[#F2F2F2] dark:divide-[#242424]">
                   {filteredRows.map((row) => {
                     const isMenuOpen = openMenu?.key === row.key;
                     return (
@@ -668,113 +674,117 @@ export function HoldingsView({
                         key={row.key}
                         className="group hover:bg-[#FAFAFA] dark:hover:bg-[#1D1D1D] transition-colors"
                       >
-                        <td className="py-3.5 px-3 border-r border-[#F0F0F0] dark:border-[#262626]">
-                          <div className="flex items-center gap-1.5">
-                            {row.type === 'equity' && row.token !== undefined ? (
+                        <td className="py-3.5 px-2.5 lg:px-3 border-r border-[#F2F2F2] dark:border-[#262626]">
+                          <div className="flex items-center justify-between gap-1.5">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              {row.type === 'equity' && row.token !== undefined ? (
+                                <button
+                                  type="button"
+                                  onClick={() => onSelectSymbolForTechnicals(row.token!)}
+                                  className="font-normal text-[13px] text-[#444444] dark:text-[#E0E0E0] hover:text-[#4184F3] cursor-pointer text-left truncate"
+                                >
+                                  {row.symbol}
+                                </button>
+                              ) : (
+                                <span className="font-normal text-[13px] text-[#444444] dark:text-[#E0E0E0] truncate">
+                                  {row.symbol}
+                                </span>
+                              )}
+                              {row.type === 'mutual_funds' && activeTab === 'all' && (
+                                <span className="text-[9.5px] px-1 py-0.2 bg-[#F1F5F9] dark:bg-[#262626] text-[#4184F3] rounded">
+                                  MF
+                                </span>
+                              )}
+                              {subFilter === 'T1 holdings' &&
+                              row.t1Quantity &&
+                              row.t1Quantity > 0 ? (
+                                <span className="text-[9.5px] px-1 py-0.2 bg-[#EFF6FF] dark:bg-[#1D2B3D] text-[#4184F3] rounded shrink-0">
+                                  T1:{row.t1Quantity}
+                                </span>
+                              ) : null}
+                            </div>
+
+                            {/* Three-Dot Action Button (appears on hover/focus or when menu open, zero table width inflation) */}
+                            <div
+                              data-holding-menu
+                              className={`shrink-0 ${
+                                isMenuOpen
+                                  ? 'opacity-100'
+                                  : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
+                              } transition-opacity`}
+                            >
                               <button
                                 type="button"
-                                onClick={() => onSelectSymbolForTechnicals(row.token!)}
-                                className="font-normal text-[#444444] dark:text-[#E0E0E0] hover:text-[#4184F3] cursor-pointer text-left"
+                                aria-label={`Actions for ${row.symbol}`}
+                                aria-haspopup="menu"
+                                aria-expanded={isMenuOpen}
+                                onClick={(e) => {
+                                  if (isMenuOpen) {
+                                    setOpenMenu(null);
+                                    return;
+                                  }
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  const openUpward = window.innerHeight - rect.bottom < 220;
+                                  setOpenMenu({
+                                    key: row.key,
+                                    top: openUpward ? rect.top - 4 : rect.bottom + 4,
+                                    right: Math.max(8, window.innerWidth - rect.right),
+                                    openUpward,
+                                  });
+                                }}
+                                className={`w-6 h-6 rounded-[3px] flex items-center justify-center transition-colors cursor-pointer ${
+                                  isMenuOpen
+                                    ? 'bg-[#EBEBEB] dark:bg-[#2E2E2E] text-[#222222] dark:text-white'
+                                    : 'hover:bg-[#EFEFEF] dark:hover:bg-[#2A2A2A] text-[#666666] dark:text-[#A0A0A0]'
+                                }`}
                               >
-                                {row.symbol}
+                                <MoreVertical className="w-3.5 h-3.5" />
                               </button>
-                            ) : (
-                              <span className="font-normal text-[#444444] dark:text-[#E0E0E0]">
-                                {row.symbol}
-                              </span>
-                            )}
-                            {row.type === 'mutual_funds' && activeTab === 'all' && (
-                              <span className="text-[9.5px] px-1 py-0.2 bg-[#F1F5F9] dark:bg-[#262626] text-[#4184F3] rounded">
-                                MF
-                              </span>
-                            )}
-                            {row.t1Quantity && row.t1Quantity > 0 ? (
-                              <span className="text-[9.5px] px-1 py-0.2 bg-[#EFF6FF] dark:bg-[#1D2B3D] text-[#4184F3] rounded">
-                                T1:{row.t1Quantity}
-                              </span>
-                            ) : null}
+                            </div>
                           </div>
                           {row.subtitle && (
                             <div className="text-[11px] text-[#9B9B9B] mt-0.5">{row.subtitle}</div>
                           )}
                         </td>
 
-                        <td className="py-3.5 px-3 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0]">
+                        <td className="py-3.5 px-2.5 lg:px-3 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0] whitespace-nowrap">
                           {row.type === 'mutual_funds' ? row.quantity.toFixed(2) : row.quantity}
                         </td>
 
-                        <td className="py-3.5 px-3 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0]">
+                        <td className="py-3.5 px-2.5 lg:px-3 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0] whitespace-nowrap">
                           {formatPrice(row.averagePrice)}
                         </td>
 
-                        <td className="py-3.5 px-3 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0] border-r border-[#F0F0F0] dark:border-[#262626]">
+                        <td className="py-3.5 px-2.5 lg:px-3 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0] border-r border-[#F2F2F2] dark:border-[#262626] whitespace-nowrap">
                           {formatPrice(row.ltp)}
                         </td>
 
-                        <td className="py-3.5 px-3 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0]">
+                        <td className="py-3.5 px-2.5 lg:px-3 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0] whitespace-nowrap">
                           {formatPrice(row.investedValue)}
                         </td>
 
-                        <td className="py-3.5 px-3 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0]">
+                        <td className="py-3.5 px-2.5 lg:px-3 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0] whitespace-nowrap">
                           {formatPrice(row.currentValue)}
                         </td>
 
                         <td
-                          className={`py-3.5 px-3 text-right tabular-nums bg-[#FAFAFA] dark:bg-[#191919] ${getChangeColorClass(row.pnl)}`}
+                          className={`py-3.5 px-2.5 lg:px-3 text-right tabular-nums bg-[#FAFAFA] dark:bg-[#191919] whitespace-nowrap ${getChangeColorClass(row.pnl)}`}
                         >
                           {formatIndianSigned(row.pnl)}
                         </td>
 
                         <td
-                          className={`py-3.5 px-3 text-right tabular-nums text-[12px] ${getChangeColorClass(row.pnlPercent)}`}
+                          className={`py-3.5 px-2.5 lg:px-3 text-right tabular-nums text-[11.5px] whitespace-nowrap ${getChangeColorClass(row.pnlPercent)}`}
                         >
                           {row.pnlPercent >= 0 ? '+' : ''}
                           {row.pnlPercent.toFixed(2)}%
                         </td>
 
-                        <td className="py-3.5 px-3 pr-9 text-right tabular-nums text-[12px] relative">
+                        <td className="py-3.5 px-2.5 lg:px-3 text-right tabular-nums text-[11.5px] whitespace-nowrap">
                           <span className={getChangeColorClass(row.dayChangePercent)}>
                             {row.dayChangePercent >= 0 ? '+' : ''}
                             {row.dayChangePercent.toFixed(2)}%
                           </span>
-
-                          {/* Three-Dot Action Button (appears on hover/focus or when menu open) */}
-                          <div
-                            data-holding-menu
-                            className={`absolute right-1 top-1/2 -translate-y-1/2 ${
-                              isMenuOpen
-                                ? 'opacity-100'
-                                : 'opacity-40 group-hover:opacity-100 group-focus-within:opacity-100'
-                            } transition-opacity`}
-                          >
-                            <button
-                              type="button"
-                              aria-label={`Actions for ${row.symbol}`}
-                              aria-haspopup="menu"
-                              aria-expanded={isMenuOpen}
-                              onClick={(e) => {
-                                if (isMenuOpen) {
-                                  setOpenMenu(null);
-                                  return;
-                                }
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                const openUpward = window.innerHeight - rect.bottom < 220;
-                                setOpenMenu({
-                                  key: row.key,
-                                  top: openUpward ? rect.top - 4 : rect.bottom + 4,
-                                  right: Math.max(8, window.innerWidth - rect.right),
-                                  openUpward,
-                                });
-                              }}
-                              className={`w-7 h-7 rounded-[3px] flex items-center justify-center transition-colors cursor-pointer ${
-                                isMenuOpen
-                                  ? 'bg-[#EBEBEB] dark:bg-[#2E2E2E] text-[#222222] dark:text-white'
-                                  : 'hover:bg-[#EFEFEF] dark:hover:bg-[#2A2A2A] text-[#666666] dark:text-[#A0A0A0]'
-                              }`}
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </button>
-                          </div>
                         </td>
                       </tr>
                     );
@@ -784,34 +794,33 @@ export function HoldingsView({
                 {/* Bold Summary Total Footer Row */}
                 <tfoot>
                   <tr className="border-t border-[#EEEEEE] dark:border-[#282828] font-medium text-[13px] tabular-nums">
-                    <td colSpan={3} className="py-3.5 px-3" />
-                    <td className="py-3.5 px-3 text-right text-[#444444] dark:text-[#E0E0E0]">
+                    <td colSpan={3} className="py-3.5 px-2.5 lg:px-3" />
+                    <td className="py-3.5 px-2.5 lg:px-3 text-right text-[#444444] dark:text-[#E0E0E0]">
                       Total
                     </td>
-                    <td className="py-3.5 px-3 text-right text-[#444444] dark:text-[#E0E0E0]">
+                    <td className="py-3.5 px-2.5 lg:px-3 text-right text-[#444444] dark:text-[#E0E0E0] whitespace-nowrap">
                       {formatPrice(totals.investment)}
                     </td>
-                    <td className="py-3.5 px-3 text-right text-[#444444] dark:text-[#E0E0E0]">
+                    <td className="py-3.5 px-2.5 lg:px-3 text-right text-[#444444] dark:text-[#E0E0E0] whitespace-nowrap">
                       {formatPrice(totals.current)}
                     </td>
                     <td
-                      className={`py-3.5 px-3 text-right bg-[#FAFAFA] dark:bg-[#191919] ${getChangeColorClass(totals.totalPnl)}`}
+                      className={`py-3.5 px-2.5 lg:px-3 text-right bg-[#FAFAFA] dark:bg-[#191919] whitespace-nowrap ${getChangeColorClass(totals.totalPnl)}`}
                     >
                       {formatIndianSigned(totals.totalPnl)}
                     </td>
                     <td
-                      className={`py-3.5 px-3 text-right text-[12px] ${getChangeColorClass(totals.totalPnlPct)}`}
+                      className={`py-3.5 px-2.5 lg:px-3 text-right text-[11.5px] whitespace-nowrap ${getChangeColorClass(totals.totalPnlPct)}`}
                     >
                       {totals.totalPnlPct >= 0 ? '+' : ''}
                       {totals.totalPnlPct.toFixed(2)}%
                     </td>
-                    <td className="py-3.5 px-3 pr-9 text-right text-[12px] whitespace-nowrap">
+                    <td className="py-3.5 px-2.5 lg:px-3 text-right text-[11.5px] whitespace-nowrap">
                       <span className="text-[#444444] dark:text-[#E0E0E0]">
                         {formatIndianSigned(totals.dayPnl)}
                       </span>{' '}
                       <span className={getChangeColorClass(totals.dayPnlPct)}>
-                        ({totals.dayPnlPct >= 0 ? '' : ''}
-                        {totals.dayPnlPct.toFixed(2)}%)
+                        ({totals.dayPnlPct.toFixed(2)}%)
                       </span>
                     </td>
                   </tr>
@@ -820,10 +829,10 @@ export function HoldingsView({
             </div>
 
             {/* Bottom Full-Width Stacked Allocation Bar + Radio Toggle */}
-            <div className="pt-2 space-y-3">
+            <div className="pt-3 space-y-3">
               <div
                 aria-label="Holdings allocation breakdown bar"
-                className="h-[46px] w-full flex overflow-hidden rounded-[2px] bg-[#F3F4F6] dark:bg-[#222222]"
+                className="h-[54px] w-full flex overflow-hidden rounded-[1px] bg-[#F3F4F6] dark:bg-[#222222]"
               >
                 {barSegments.map((seg) => (
                   <div
@@ -839,7 +848,7 @@ export function HoldingsView({
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="text-[15px] font-normal tabular-nums text-[#444444] dark:text-[#E0E0E0]">
+                <div className="text-[14px] font-normal tabular-nums text-[#444444] dark:text-[#E0E0E0]">
                   {barHeadlineValue < 0 ? '-' : ''}₹
                   {Math.abs(barHeadlineValue).toLocaleString('en-IN', {
                     minimumFractionDigits: 2,
