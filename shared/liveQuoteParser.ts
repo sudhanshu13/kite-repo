@@ -249,3 +249,80 @@ export function deriveFuturesSnapshotFromSpot(
     historyCloses: spotSnapshot.historyCloses.map((c) => roundTick(c * basisFactor, tick)),
   };
 }
+
+export interface YahooSearchQuote {
+  symbol?: string;
+  shortname?: string;
+  longname?: string;
+  exchange?: string;
+  quoteType?: string;
+  sector?: string;
+  sectorDisp?: string;
+}
+
+export interface YahooSearchResponse {
+  quotes?: YahooSearchQuote[];
+}
+
+/**
+ * Generates a deterministic numeric token in [70_000_000, 89_999_999] for dynamically discovered NSE/BSE stocks.
+ */
+export function hashDynamicInstrumentToken(exchange: 'NSE' | 'BSE', symbol: string): number {
+  const key = `${exchange}:${symbol.toUpperCase()}`;
+  let hash = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  const unsigned = hash >>> 0;
+  return 70_000_000 + (unsigned % 20_000_000);
+}
+
+/**
+ * Converts Yahoo Finance search results into Indian NSE/BSE Instrument entries.
+ */
+export function parseYahooSearchQuotes(payload: YahooSearchResponse): Instrument[] {
+  const rawQuotes = payload?.quotes;
+  if (!Array.isArray(rawQuotes)) return [];
+
+  const seen = new Set<string>();
+  const results: Instrument[] = [];
+
+  for (const item of rawQuotes) {
+    const yahooSym = typeof item.symbol === 'string' ? item.symbol.trim().toUpperCase() : '';
+    if (!yahooSym) continue;
+    const isNse = yahooSym.endsWith('.NS');
+    const isBse = yahooSym.endsWith('.BO');
+    if (!isNse && !isBse) continue;
+
+    const qt = (item.quoteType ?? '').toUpperCase();
+    if (qt && qt !== 'EQUITY' && qt !== 'ETF' && qt !== 'MUTUALFUND') continue;
+
+    const exchange: 'NSE' | 'BSE' = isNse ? 'NSE' : 'BSE';
+    const cleanSymbol = yahooSym.slice(0, -3);
+    if (!cleanSymbol || cleanSymbol.length > 24) continue;
+
+    const dedupeKey = `${exchange}:${cleanSymbol}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
+    const displayName = (item.longname || item.shortname || cleanSymbol).trim();
+    const sector = (item.sectorDisp || item.sector || (qt === 'ETF' ? 'ETF' : 'Equity')).trim();
+
+    results.push({
+      token: hashDynamicInstrumentToken(exchange, cleanSymbol),
+      symbol: cleanSymbol,
+      name: exchange === 'BSE' && !displayName.includes('(BSE)') ? `${displayName} (BSE)` : displayName,
+      exchange,
+      lotSize: 1,
+      tickSize: 0.05,
+      basePrice: 100,
+      sector,
+      instrumentType: 'EQ',
+      underlying: cleanSymbol,
+      yahooSymbol: yahooSym,
+    });
+  }
+
+  return results;
+}

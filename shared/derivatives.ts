@@ -224,6 +224,109 @@ function buildSearchCorpus(inst: Instrument): {
 }
 
 /**
+ * Fast Damerau-Levenshtein distance <= 1 check (1 insertion, deletion, substitution, or adjacent swap).
+ * Used for forgiving 1-character typos in equity searches (e.g. "idia" -> "india", "relaince" -> "reliance").
+ */
+export function isWithinEditDistance1(a: string, b: string): boolean {
+  if (a === b) return true;
+  const lenA = a.length;
+  const lenB = b.length;
+  if (Math.abs(lenA - lenB) > 1) return false;
+
+  if (lenA === lenB) {
+    let diff = 0;
+    for (let i = 0; i < lenA; i++) {
+      if (a[i] !== b[i]) {
+        // Adjacent transposition counts as 1 edit
+        if (
+          diff === 0 &&
+          i + 1 < lenA &&
+          a[i] === b[i + 1] &&
+          a[i + 1] === b[i]
+        ) {
+          diff++;
+          i++;
+          continue;
+        }
+        diff++;
+        if (diff > 1) return false;
+      }
+    }
+    return diff === 1;
+  }
+
+  // Length differs by 1: check single insertion/deletion
+  const shorter = lenA < lenB ? a : b;
+  const longer = lenA < lenB ? b : a;
+  let i = 0;
+  let j = 0;
+  let skipped = false;
+  while (i < shorter.length && j < longer.length) {
+    if (shorter[i] === longer[j]) {
+      i++;
+      j++;
+    } else if (!skipped) {
+      skipped = true;
+      j++;
+    } else {
+      return false;
+    }
+  }
+  return true;
+}
+
+function scoreTextTokenAgainstCorpus(
+  tok: string,
+  corpus: ReturnType<typeof buildSearchCorpus>,
+  allowFuzzy: boolean,
+): number {
+  const candidates =
+    tok.length >= 5 && tok.endsWith('s') ? [tok, tok.slice(0, -1)] : [tok];
+
+  for (const cand of candidates) {
+    if (corpus.symbolLower === cand || corpus.underlyingLower === cand) {
+      return 110;
+    }
+    if (
+      corpus.symbolLower.startsWith(cand) ||
+      corpus.underlyingLower.startsWith(cand)
+    ) {
+      return 70;
+    }
+    if (corpus.words.some((w) => w.startsWith(cand))) {
+      return 50;
+    }
+    if (corpus.fullText.includes(cand)) {
+      return 25;
+    }
+  }
+
+  if (allowFuzzy && tok.length >= 4) {
+    // Check fuzzy 1-edit match against symbol prefix or individual company-name words
+    if (
+      isWithinEditDistance1(tok, corpus.symbolLower) ||
+      (corpus.symbolLower.length >= tok.length &&
+        isWithinEditDistance1(tok, corpus.symbolLower.slice(0, tok.length)))
+    ) {
+      return 40;
+    }
+    for (const w of corpus.words) {
+      if (w.length < 3) continue;
+      if (
+        isWithinEditDistance1(tok, w) ||
+        (w.length >= tok.length &&
+          w.length <= tok.length + 2 &&
+          isWithinEditDistance1(tok, w.slice(0, tok.length)))
+      ) {
+        return 35;
+      }
+    }
+  }
+
+  return 0;
+}
+
+/**
  * Multi-token smart search & relevance ranking across Equities, Indices, Futures, and Option Strikes.
  */
 export function searchInstruments(
@@ -256,6 +359,14 @@ export function searchInstruments(
       t === 'jan' ||
       /^\d{3,5}$/.test(t),
   );
+  const queryHasExchangeHint = tokens.some(
+    (t) => t === 'nse' || t === 'bse' || t === 'nfo' || t === 'bfo',
+  );
+  const allowPartialMultiWordEquity =
+    !queryHasDerivativeHint &&
+    !queryHasExchangeHint &&
+    (category === 'all' || category === 'eq') &&
+    tokens.length >= 2;
 
   const scored: Array<{ inst: Instrument; score: number }> = [];
 
@@ -267,20 +378,27 @@ export function searchInstruments(
 
     const corpus = buildSearchCorpus(inst);
 
-    let allMatched = true;
+    let hardFailed = false;
+    let matchedCount = 0;
+    let firstTokenMatched = false;
     let score = 0;
+    const allowFuzzy = !queryHasDerivativeHint && effType === 'EQ';
 
-    for (const tok of tokens) {
+    for (let idx = 0; idx < tokens.length; idx++) {
+      const tok = tokens[idx];
       const isNumericStrike = /^\d{3,5}$/.test(tok);
       if (isNumericStrike) {
         if (corpus.strikeStr === tok) {
           score += 120;
+          matchedCount++;
         } else if (corpus.strikeStr.startsWith(tok)) {
           score += 75;
+          matchedCount++;
         } else if (corpus.fullText.includes(tok)) {
           score += 20;
+          matchedCount++;
         } else {
-          allMatched = false;
+          hardFailed = true;
           break;
         }
         continue;
@@ -289,8 +407,9 @@ export function searchInstruments(
       if (tok === 'ce' || tok === 'pe' || tok === 'fut') {
         if (corpus.typeLower === tok) {
           score += 90;
+          matchedCount++;
         } else {
-          allMatched = false;
+          hardFailed = true;
           break;
         }
         continue;
@@ -299,31 +418,38 @@ export function searchInstruments(
       if (tok === 'nse' || tok === 'bse' || tok === 'nfo' || tok === 'bfo') {
         if (corpus.exchangeLower === tok) {
           score += 80;
+          matchedCount++;
         } else {
-          allMatched = false;
+          hardFailed = true;
           break;
         }
         continue;
       }
 
-      if (corpus.symbolLower === tok || corpus.underlyingLower === tok) {
-        score += 110;
-      } else if (
-        corpus.symbolLower.startsWith(tok) ||
-        corpus.underlyingLower.startsWith(tok)
-      ) {
-        score += 70;
-      } else if (corpus.words.some((w) => w.startsWith(tok))) {
-        score += 45;
-      } else if (corpus.fullText.includes(tok)) {
-        score += 20;
-      } else {
-        allMatched = false;
+      const tokenScore = scoreTextTokenAgainstCorpus(tok, corpus, allowFuzzy);
+      if (tokenScore > 0) {
+        score += tokenScore;
+        matchedCount++;
+        if (idx === 0) firstTokenMatched = true;
+      } else if (!allowPartialMultiWordEquity || effType !== 'EQ') {
+        hardFailed = true;
         break;
       }
     }
 
-    if (!allMatched) continue;
+    if (hardFailed || matchedCount === 0) continue;
+
+    const allMatched = matchedCount === tokens.length;
+    if (!allMatched) {
+      // Secondary partial match for multi-word equity queries (e.g. "india cement" -> INDIAGLYCO, INDIAMART below INDIACEM)
+      // Require strong prefix/word match on the first token (len >= 4) so irrelevant noise never creeps in
+      if (!firstTokenMatched || tokens[0].length < 4) continue;
+      const firstScore = scoreTextTokenAgainstCorpus(tokens[0], corpus, false);
+      if (firstScore < 50) continue;
+    } else {
+      // Full match always ranks cleanly above partial matches
+      score += 500;
+    }
 
     if (corpus.symbolLower === normalizedQuery) {
       score += 300;
@@ -335,7 +461,6 @@ export function searchInstruments(
     if (effType === 'FUT' || effType === 'CE' || effType === 'PE') {
       const dte = inst.daysToExpiry ?? 30;
       score += Math.max(0, 25 - Math.min(25, Math.round(dte / 3)));
-      // Prefer exact underlying match over substring (e.g. NIFTY ahead of BANKNIFTY when searching "nifty fut")
       if (tokens[0] === corpus.underlyingLower) {
         score += 45;
       }
@@ -350,12 +475,16 @@ export function searchInstruments(
       }
     }
 
+    // Prefer NSE slightly above BSE when scores are otherwise tied
+    if (inst.exchange === 'NSE') {
+      score += 2;
+    }
+
     scored.push({ inst, score });
   }
 
   scored.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
-    // Tie-breaker: near expiry first, then strike ascending, then CE before PE
     const dteDiff = (a.inst.daysToExpiry ?? 0) - (b.inst.daysToExpiry ?? 0);
     if (dteDiff !== 0) return dteDiff;
     const strikeDiff = (a.inst.strike ?? 0) - (b.inst.strike ?? 0);
@@ -365,3 +494,4 @@ export function searchInstruments(
 
   return scored.slice(0, limit).map((s) => s.inst);
 }
+

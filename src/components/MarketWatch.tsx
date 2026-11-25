@@ -6,6 +6,7 @@ import {
   ChevronRight,
   ChevronUp,
   FolderInput,
+  Loader2,
   Plus,
   Search,
   SlidersVertical,
@@ -22,6 +23,7 @@ import type {
   OrderSide,
   WatchlistSignalsMap,
 } from '../../shared/types.ts';
+import { apiFetch } from '../utils/api.ts';
 import { formatPrice, getChangeColorClass, getSignalTextClass } from '../utils/format.ts';
 
 interface MarketWatchProps {
@@ -35,6 +37,10 @@ interface MarketWatchProps {
   onSelectSymbolForTechnicals: (token: number) => void;
   onUpdateWatchlist: (watchlistId: string, tokens: number[]) => void;
   onOpenOrderModal: (token: number, side: OrderSide) => void;
+  onMergeDiscoveredInstruments?: (
+    instruments: Instrument[],
+    quotes: MarketQuote[],
+  ) => void;
 }
 
 interface WatchlistGroup {
@@ -132,10 +138,12 @@ export function MarketWatch({
   onSelectSymbolForTechnicals,
   onUpdateWatchlist,
   onOpenOrderModal,
+  onMergeDiscoveredInstruments,
 }: MarketWatchProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchCategory, setSearchCategory] = useState<SearchCategoryFilter>('all');
   const [searchFocused, setSearchFocused] = useState(false);
+  const [isSearchingRemote, setIsSearchingRemote] = useState(false);
   const [expandedDepthToken, setExpandedDepthToken] = useState<number | null>(null);
   const [flashMap, setFlashMap] = useState<Record<number, 'up' | 'down'>>({});
   const [savedGroupsByWl, setSavedGroupsByWl] = useState<Record<string, WatchlistGroup[]>>(
@@ -276,9 +284,56 @@ export function MarketWatch({
     if (!q) return [];
     return searchInstruments(instruments, q, {
       category: searchCategory,
-      limit: 25,
+      limit: 50,
     });
   }, [instruments, searchQuery, searchCategory]);
+
+  // Live NSE/BSE discovery for any Indian listed stock or ETF beyond the built-in catalog
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (
+      !searchFocused ||
+      q.length < 2 ||
+      (searchCategory !== 'all' && searchCategory !== 'eq') ||
+      /\b(fut|futures|ce|pe|call|put|\d{4,6}\s*(?:ce|pe))\b/i.test(q)
+    ) {
+      setIsSearchingRemote(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsSearchingRemote(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await apiFetch(
+          `/api/instruments?q=${encodeURIComponent(q)}&category=${encodeURIComponent(searchCategory)}&live=1`,
+        );
+        if (cancelled) return;
+        if (res.ok) {
+          const data = (await res.json()) as {
+            instruments?: Instrument[];
+            quotes?: MarketQuote[];
+          };
+          if (!cancelled && onMergeDiscoveredInstruments) {
+            onMergeDiscoveredInstruments(
+              Array.isArray(data.instruments) ? data.instruments : [],
+              Array.isArray(data.quotes) ? data.quotes : [],
+            );
+          }
+        }
+      } catch {
+        // Ignore transient network errors during live search
+      } finally {
+        if (!cancelled) setIsSearchingRemote(false);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchFocused, searchQuery, searchCategory, onMergeDiscoveredInstruments]);
 
   function persistCurrentGroups(nextGroups: WatchlistGroup[]) {
     setSavedGroupsByWl((prev) => {
@@ -371,7 +426,7 @@ export function MarketWatch({
   return (
     <aside
       aria-label="Marketwatch"
-      className="w-full lg:w-[390px] xl:w-[410px] shrink-0 bg-[#FCFCFC] dark:bg-[#141414] border-b lg:border-b-0 lg:border-r border-[#EEEEEE] dark:border-[#282828] flex flex-col lg:h-[calc(100vh-50px)]"
+      className="w-full lg:w-[390px] xl:w-[410px] shrink-0 bg-[#FCFCFC] dark:bg-[#141414] border-b lg:border-b-0 lg:border-r border-[#EEEEEE] dark:border-[#282828] flex flex-col lg:h-full"
     >
       {/* Top Bordered Search Box (Exact Kite Style with Ctrl+K & Filter Sliders) */}
       <div ref={searchContainerRef} className="relative px-3 pt-2.5 pb-1.5">
@@ -510,15 +565,23 @@ export function MarketWatch({
                   </button>
                 );
               })}
-              <span className="ml-auto text-[10px] text-[#9B9B9B] tabular-nums pr-1">
-                {searchResults.length} shown
+              <span className="ml-auto flex items-center gap-1.5 text-[10px] text-[#9B9B9B] tabular-nums pr-1">
+                {isSearchingRemote && (
+                  <span className="inline-flex items-center gap-1 text-[#4184F3]">
+                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                    <span>NSE/BSE</span>
+                  </span>
+                )}
+                <span>{searchResults.length} shown</span>
               </span>
             </div>
 
             <div className="max-h-80 overflow-y-auto divide-y divide-[#EEEEEE] dark:divide-[#282828]">
               {searchResults.length === 0 ? (
                 <div className="px-3 py-4 text-xs text-center text-[#9B9B9B]">
-                  No instruments matched &ldquo;{searchQuery}&rdquo;
+                  {isSearchingRemote
+                    ? `Searching NSE & BSE for “${searchQuery}”...`
+                    : `No instruments matched “${searchQuery}”`}
                 </div>
               ) : (
                 searchResults.map((inst) => {

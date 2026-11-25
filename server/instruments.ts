@@ -1,9 +1,26 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { priceOptionBlackScholes } from '../shared/derivatives.ts';
+import { hashDynamicInstrumentToken } from '../shared/liveQuoteParser.ts';
+import { parseNseEquityCsv, parseNseEtfCsv } from '../shared/nseMasterParser.ts';
 import type { Exchange, Instrument } from '../shared/types.ts';
 
 export const NIFTY_TOKEN = 256265;
 export const SENSEX_TOKEN = 265;
 export const BANKNIFTY_TOKEN = 260105;
+
+const CUSTOM_INSTRUMENTS_FILE = path.resolve(
+  process.cwd(),
+  '.data',
+  'custom-instruments.json',
+);
+
+const NSE_MASTER_CACHE_FILE = path.resolve(
+  process.cwd(),
+  '.data',
+  'nse-master-cache.json',
+);
+const NSE_MASTER_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const BASE_INSTRUMENTS: Instrument[] = [
   {
@@ -478,6 +495,227 @@ const BASE_INSTRUMENTS: Instrument[] = [
   },
 ];
 
+// Core priority tokens fetched eagerly on startup for instant live prices
+export const CORE_LIVE_SYNC_TOKENS = new Set<number>(
+  BASE_INSTRUMENTS.filter((i) => Boolean(i.yahooSymbol)).map((i) => i.token),
+);
+
+// Extended Nifty 50, Nifty Next 50, Midcap, PSU, New-Age Tech, Defence, Railway & Popular ETFs
+const EXTENDED_EQUITY_SEEDS: Array<
+  [symbol: string, name: string, sector: string, basePrice: number, exchange?: 'NSE' | 'BSE']
+> = [
+  // Remaining Nifty 50 Constituents
+  ['HINDUNILVR', 'Hindustan Unilever Ltd.', 'FMCG', 2384.5],
+  ['M&M', 'Mahindra & Mahindra Ltd.', 'Auto', 3128.4],
+  ['NTPC', 'NTPC Ltd.', 'Power', 368.4],
+  ['ULTRACEMCO', 'UltraTech Cement Ltd.', 'Cement', 11680.5],
+  ['INDIACEM', 'The India Cements Limited', 'Cement', 368.0],
+  ['ONGC', 'Oil & Natural Gas Corporation Ltd.', 'Energy', 264.15],
+  ['ADANIPORTS', 'Adani Ports and Special Economic Zone Ltd.', 'Infrastructure', 1345.9],
+  ['POWERGRID', 'Power Grid Corporation of India Ltd.', 'Power', 314.25],
+  ['BAJAJFINSV', 'Bajaj Finserv Ltd.', 'NBFC', 1794.0],
+  ['BAJAJ-AUTO', 'Bajaj Auto Ltd.', 'Auto', 9180.0],
+  ['COALINDIA', 'Coal India Ltd.', 'Mining', 418.75],
+  ['TATAMOTORS', 'Tata Motors Ltd.', 'Auto', 794.6],
+  ['JSWSTEEL', 'JSW Steel Ltd.', 'Metals', 982.4],
+  ['TATASTEEL', 'Tata Steel Ltd.', 'Metals', 148.35],
+  ['TECHM', 'Tech Mahindra Ltd.', 'IT', 1648.9],
+  ['GRASIM', 'Grasim Industries Ltd.', 'Cement', 2564.4],
+  ['CIPLA', 'Cipla Ltd.', 'Pharma', 1518.6],
+  ['EICHERMOT', 'Eicher Motors Ltd.', 'Auto', 4924.2],
+  ['DRREDDY', "Dr. Reddy's Laboratories Ltd.", 'Pharma', 1248.5],
+  ['BPCL', 'Bharat Petroleum Corporation Ltd.', 'Energy', 292.4],
+  ['INDUSINDBK', 'IndusInd Bank Ltd.', 'Banking', 968.2],
+  ['NESTLEIND', 'Nestle India Ltd.', 'FMCG', 2245.0],
+  ['APOLLOHOSP', 'Apollo Hospitals Enterprise Ltd.', 'Healthcare', 6940.0],
+  ['DIVISLAB', "Divi's Laboratories Ltd.", 'Pharma', 5890.0],
+  ['HEROMOTOCO', 'Hero MotoCorp Ltd.', 'Auto', 4620.0],
+  ['HINDALCO', 'Hindalco Industries Ltd.', 'Metals', 654.0],
+  ['BRITANNIA', 'Britannia Industries Ltd.', 'FMCG', 4980.0],
+  ['SBILIFE', 'SBI Life Insurance Company Ltd.', 'Insurance', 1545.0],
+  ['HDFCLIFE', 'HDFC Life Insurance Company Ltd.', 'Insurance', 662.0],
+  ['SHRIRAMFIN', 'Shriram Finance Ltd.', 'NBFC', 612.0],
+  ['TATACONSUM', 'Tata Consumer Products Ltd.', 'FMCG', 984.0],
+  ['JIOFIN', 'Jio Financial Services Ltd.', 'NBFC', 312.6],
+  // Nifty Next 50 & Large Cap
+  ['LICI', 'Life Insurance Corporation of India', 'Insurance', 895.0],
+  ['DMART', 'Avenue Supermarts Ltd.', 'Retail', 3895.0],
+  ['DLF', 'DLF Ltd.', 'Real Estate', 786.2],
+  ['SIEMENS', 'Siemens Ltd.', 'Capital Goods', 5420.0],
+  ['ABB', 'ABB India Ltd.', 'Capital Goods', 6890.0],
+  ['INDIGO', 'InterGlobe Aviation Ltd.', 'Aviation', 4612.8],
+  ['VBL', 'Varun Beverages Ltd.', 'FMCG', 542.15],
+  ['PIDILITIND', 'Pidilite Industries Ltd.', 'Chemicals', 2986.0],
+  ['TVSMOTOR', 'TVS Motor Company Ltd.', 'Auto', 2685.0],
+  ['TATAPOWER', 'Tata Power Company Ltd.', 'Power', 412.5],
+  ['ADANIGREEN', 'Adani Green Energy Ltd.', 'Power', 1085.0],
+  ['ADANIPOWER', 'Adani Power Ltd.', 'Power', 548.0],
+  ['ATGL', 'Adani Total Gas Ltd.', 'Energy', 675.0],
+  ['IOC', 'Indian Oil Corporation Ltd.', 'Energy', 138.5],
+  ['GAIL', 'GAIL (India) Ltd.', 'Energy', 194.2],
+  ['VEDL', 'Vedanta Ltd.', 'Metals', 452.0],
+  ['SAIL', 'Steel Authority of India Ltd.', 'Metals', 118.4],
+  ['NMDC', 'NMDC Ltd.', 'Mining', 72.5],
+  ['PNB', 'Punjab National Bank', 'Banking', 104.2],
+  ['BANKBARODA', 'Bank of Baroda', 'Banking', 241.5],
+  ['CANBK', 'Canara Bank', 'Banking', 102.8],
+  ['UNIONBANK', 'Union Bank of India', 'Banking', 118.6],
+  ['IDFCFIRSTB', 'IDFC First Bank Ltd.', 'Banking', 64.5],
+  ['YESBANK', 'Yes Bank Ltd.', 'Banking', 20.15],
+  ['FEDERALBNK', 'Federal Bank Ltd.', 'Banking', 198.4],
+  ['AUBANK', 'AU Small Finance Bank Ltd.', 'Banking', 596.0],
+  ['BANDHANBNK', 'Bandhan Bank Ltd.', 'Banking', 164.2],
+  ['RBLBANK', 'RBL Bank Ltd.', 'Banking', 168.5],
+  ['CHOLAFIN', 'Cholamandalam Investment & Finance Co.', 'NBFC', 1345.0],
+  ['MUTHOOTFIN', 'Muthoot Finance Ltd.', 'NBFC', 2140.0],
+  ['LICHSGFIN', 'LIC Housing Finance Ltd.', 'NBFC', 612.0],
+  ['MANAPPURAM', 'Manappuram Finance Ltd.', 'NBFC', 184.5],
+  ['BAJAJHFL', 'Bajaj Housing Finance Ltd.', 'NBFC', 128.4],
+  ['PFC', 'Power Finance Corporation Ltd.', 'NBFC', 448.0],
+  ['RECLTD', 'REC Ltd.', 'NBFC', 492.0],
+  ['IREDA', 'Indian Renewable Energy Development Agency', 'NBFC', 204.5],
+  ['HUDCO', 'Housing & Urban Development Corp. Ltd.', 'NBFC', 234.0],
+  // Defence, Railways, PSU & Energy
+  ['MAZDOCK', 'Mazagon Dock Shipbuilders Ltd.', 'Defence', 2340.0],
+  ['COCHINSHIP', 'Cochin Shipyard Ltd.', 'Defence', 1540.0],
+  ['BDL', 'Bharat Dynamics Ltd.', 'Defence', 1245.0],
+  ['SOLARINDS', 'Solar Industries India Ltd.', 'Defence', 10450.0],
+  ['IRCTC', 'Indian Railway Catering & Tourism Corp.', 'Railways', 815.0],
+  ['IRFC', 'Indian Railway Finance Corporation Ltd.', 'Railways', 148.6],
+  ['RVNL', 'Rail Vikas Nigam Ltd.', 'Railways', 432.0],
+  ['BHEL', 'Bharat Heavy Electricals Ltd.', 'Capital Goods', 234.5],
+  ['NBCC', 'NBCC (India) Ltd.', 'Infrastructure', 98.4],
+  ['NCC', 'NCC Ltd.', 'Infrastructure', 276.0],
+  ['NHPC', 'NHPC Ltd.', 'Power', 84.6],
+  ['SJVN', 'SJVN Ltd.', 'Power', 112.4],
+  ['SUZLON', 'Suzlon Energy Ltd.', 'Power', 62.8],
+  ['TORNTPOWER', 'Torrent Power Ltd.', 'Power', 1520.0],
+  ['CGPOWER', 'CG Power and Industrial Solutions Ltd.', 'Capital Goods', 715.0],
+  ['CUMMINSIND', 'Cummins India Ltd.', 'Capital Goods', 3240.0],
+  ['CONCOR', 'Container Corporation of India Ltd.', 'Logistics', 792.0],
+  ['GMRINFRA', 'GMR Airports Ltd.', 'Infrastructure', 82.4],
+  // IT, Internet & New-Age Tech
+  ['LTIM', 'LTIMindtree Ltd.', 'IT', 5840.0],
+  ['PERSISTENT', 'Persistent Systems Ltd.', 'IT', 5620.0],
+  ['COFORGE', 'Coforge Ltd.', 'IT', 8120.0],
+  ['MPHASIS', 'Mphasis Ltd.', 'IT', 2890.0],
+  ['KPITTECH', 'KPIT Technologies Ltd.', 'IT', 1410.0],
+  ['TATAELXSI', 'Tata Elxsi Ltd.', 'IT', 6940.0],
+  ['TATATECH', 'Tata Technologies Ltd.', 'IT', 912.0],
+  ['OFSS', 'Oracle Financial Services Software Ltd.', 'IT', 11240.0],
+  ['NAUKRI', 'Info Edge (India) Ltd.', 'Internet', 7820.0],
+  ['PAYTM', 'One 97 Communications Ltd. (Paytm)', 'Internet', 892.0],
+  ['NYKAA', 'FSN E-Commerce Ventures Ltd. (Nykaa)', 'Internet', 174.5],
+  ['POLICYBZR', 'PB Fintech Ltd. (Policybazaar)', 'Internet', 1865.0],
+  ['DELHIVERY', 'Delhivery Ltd.', 'Logistics', 348.0],
+  ['SWIGGY', 'Swiggy Ltd.', 'Internet', 462.0],
+  ['OLAELEC', 'Ola Electric Mobility Ltd.', 'Auto', 88.5],
+  ['FIRSTCRY', 'Brainbees Solutions Ltd. (FirstCry)', 'Retail', 568.0],
+  ['HYUNDAI', 'Hyundai Motor India Ltd.', 'Auto', 1845.0],
+  ['WAAREEENER', 'Waaree Energies Ltd.', 'Power', 2740.0],
+  ['IDEA', 'Vodafone Idea Ltd.', 'Telecom', 8.15],
+  ['TATACOMM', 'Tata Communications Ltd.', 'Telecom', 1745.0],
+  ['HFCL', 'HFCL Ltd.', 'Telecom', 124.0],
+  // Capital Markets, EMS & Consumer Durables
+  ['BSE', 'BSE Ltd.', 'Capital Markets', 4680.0],
+  ['CDSL', 'Central Depository Services (India) Ltd.', 'Capital Markets', 1620.0],
+  ['MCX', 'Multi Commodity Exchange of India Ltd.', 'Capital Markets', 6240.0],
+  ['ANGELONE', 'Angel One Ltd.', 'Capital Markets', 2840.0],
+  ['CAMS', 'Computer Age Management Services Ltd.', 'Capital Markets', 4520.0],
+  ['KFINTECH', 'KFin Technologies Ltd.', 'Capital Markets', 1120.0],
+  ['IEX', 'Indian Energy Exchange Ltd.', 'Capital Markets', 178.5],
+  ['DIXON', 'Dixon Technologies (India) Ltd.', 'Electronics', 15840.0],
+  ['KAYNES', 'Kaynes Technology India Ltd.', 'Electronics', 5920.0],
+  ['HAVELLS', 'Havells India Ltd.', 'Consumer Durables', 1685.0],
+  ['POLYCAB', 'Polycab India Ltd.', 'Consumer Durables', 6740.0],
+  ['VOLTAS', 'Voltas Ltd.', 'Consumer Durables', 1720.0],
+  // Auto & Ancillaries
+  ['ASHOKLEY', 'Ashok Leyland Ltd.', 'Auto', 224.0],
+  ['BHARATFORG', 'Bharat Forge Ltd.', 'Auto', 1320.0],
+  ['MOTHERSON', 'Samvardhana Motherson International Ltd.', 'Auto', 162.5],
+  ['EXIDEIND', 'Exide Industries Ltd.', 'Auto', 438.0],
+  ['MRF', 'MRF Ltd.', 'Auto', 124500.0],
+  ['BOSCHLTD', 'Bosch Ltd.', 'Auto', 34200.0],
+  // Pharma & Healthcare
+  ['LUPIN', 'Lupin Ltd.', 'Pharma', 2085.0],
+  ['AUROPHARMA', 'Aurobindo Pharma Ltd.', 'Pharma', 1265.0],
+  ['ZYDUSLIFE', 'Zydus Lifesciences Ltd.', 'Pharma', 985.0],
+  ['TORNTPHARM', 'Torrent Pharmaceuticals Ltd.', 'Pharma', 3280.0],
+  ['BIOCON', 'Biocon Ltd.', 'Pharma', 342.0],
+  ['MAXHEALTH', 'Max Healthcare Institute Ltd.', 'Healthcare', 1065.0],
+  ['FORTIS', 'Fortis Healthcare Ltd.', 'Healthcare', 684.0],
+  ['MANKIND', 'Mankind Pharma Ltd.', 'Pharma', 2590.0],
+  ['ALKEM', 'Alkem Laboratories Ltd.', 'Pharma', 5540.0],
+  ['LAURUSLABS', 'Laurus Labs Ltd.', 'Pharma', 548.0],
+  // FMCG, Real Estate, Cement & Chemicals
+  ['DABUR', 'Dabur India Ltd.', 'FMCG', 524.0],
+  ['MARICO', 'Marico Ltd.', 'FMCG', 632.0],
+  ['GODREJCP', 'Godrej Consumer Products Ltd.', 'FMCG', 1185.0],
+  ['COLPAL', 'Colgate-Palmolive (India) Ltd.', 'FMCG', 2890.0],
+  ['UNITDSPR', 'United Spirits Ltd.', 'FMCG', 1485.0],
+  ['UBL', 'United Breweries Ltd.', 'FMCG', 1965.0],
+  ['JUBLFOOD', 'Jubilant FoodWorks Ltd.', 'Consumer', 648.0],
+  ['PAGEIND', 'Page Industries Ltd.', 'Retail', 45200.0],
+  ['INDHOTEL', 'Indian Hotels Company Ltd.', 'Hospitality', 792.0],
+  ['OBEROIRLTY', 'Oberoi Realty Ltd.', 'Real Estate', 1985.0],
+  ['GODREJPROP', 'Godrej Properties Ltd.', 'Real Estate', 2740.0],
+  ['PRESTIGE', 'Prestige Estates Projects Ltd.', 'Real Estate', 1645.0],
+  ['LODHA', 'Macrotech Developers Ltd. (Lodha)', 'Real Estate', 1320.0],
+  ['ACC', 'ACC Ltd.', 'Cement', 2180.0],
+  ['AMBUJACEM', 'Ambuja Cements Ltd.', 'Cement', 542.0],
+  ['SHREECEM', 'Shree Cement Ltd.', 'Cement', 25800.0],
+  ['SRF', 'SRF Ltd.', 'Chemicals', 2340.0],
+  ['PIIND', 'PI Industries Ltd.', 'Chemicals', 4120.0],
+  ['UPL', 'UPL Ltd.', 'Chemicals', 548.0],
+  ['DEEPAKNTR', 'Deepak Nitrite Ltd.', 'Chemicals', 2680.0],
+  ['TATACHEM', 'Tata Chemicals Ltd.', 'Chemicals', 1065.0],
+  ['ASTRAL', 'Astral Ltd.', 'Building Materials', 1785.0],
+  ['SUPREMEIND', 'Supreme Industries Ltd.', 'Building Materials', 4620.0],
+  ['BERGEPAINT', 'Berger Paints India Ltd.', 'Consumer', 498.0],
+  ['RPOWER', 'Reliance Power Ltd.', 'Power', 42.5],
+  ['JPPOWER', 'Jaiprakash Power Ventures Ltd.', 'Power', 18.4],
+  ['TRIDENT', 'Trident Ltd.', 'Textiles', 34.2],
+  ['ANTGRAPHIC', 'Antarctica Ltd. (BSE)', 'Packaging', 0.72, 'BSE'],
+  // Popular Indian Index & Commodity ETFs
+  ['NIFTYBEES', 'Nippon India ETF Nifty 50 BeES', 'ETF', 278.5],
+  ['BANKBEES', 'Nippon India ETF Nifty Bank BeES', 'ETF', 542.0],
+  ['GOLDBEES', 'Nippon India ETF Gold BeES', 'ETF', 66.4],
+  ['SILVERBEES', 'Nippon India Silver ETF', 'ETF', 88.2],
+  ['LIQUIDBEES', 'Nippon India ETF Liquid BeES', 'ETF', 1000.0],
+  ['JUNIORBEES', 'Nippon India ETF Nifty Next 50 Junior BeES', 'ETF', 745.0],
+  ['ITBEES', 'Nippon India ETF Nifty IT', 'ETF', 44.8],
+];
+
+function buildExtendedEquities(): Instrument[] {
+  const existingKeys = new Set(
+    BASE_INSTRUMENTS.map((i) => `${i.exchange}:${i.symbol.toUpperCase()}`),
+  );
+  const items: Instrument[] = [];
+
+  for (const [symbol, name, sector, basePrice, exchangeOpt] of EXTENDED_EQUITY_SEEDS) {
+    const exchange: 'NSE' | 'BSE' = exchangeOpt ?? 'NSE';
+    const key = `${exchange}:${symbol.toUpperCase()}`;
+    if (existingKeys.has(key)) continue;
+    existingKeys.add(key);
+
+    items.push({
+      token: hashDynamicInstrumentToken(exchange, symbol),
+      symbol,
+      name,
+      exchange,
+      lotSize: 1,
+      tickSize: 0.05,
+      basePrice,
+      sector,
+      instrumentType: 'EQ',
+      underlying: symbol,
+      yahooSymbol: `${symbol}.${exchange === 'NSE' ? 'NS' : 'BO'}`,
+    });
+  }
+
+  return items;
+}
+
 function buildDerivativeInstruments(): Instrument[] {
   const derivatives: Instrument[] = [];
   let nextToken = 50000001;
@@ -780,14 +1018,216 @@ function buildDerivativeInstruments(): Instrument[] {
   return derivatives;
 }
 
+function loadPersistedDynamicInstruments(): Instrument[] {
+  try {
+    if (!fs.existsSync(CUSTOM_INSTRUMENTS_FILE)) return [];
+    const raw = fs.readFileSync(CUSTOM_INSTRUMENTS_FILE, 'utf-8');
+    const parsed = JSON.parse(raw) as Instrument[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+interface NseMasterCachePayload {
+  updatedAt: number;
+  instruments: Instrument[];
+}
+
+function loadCachedNseMaster(): NseMasterCachePayload | null {
+  try {
+    if (!fs.existsSync(NSE_MASTER_CACHE_FILE)) return null;
+    const raw = fs.readFileSync(NSE_MASTER_CACHE_FILE, 'utf-8');
+    const parsed = JSON.parse(raw) as NseMasterCachePayload;
+    if (
+      parsed &&
+      typeof parsed.updatedAt === 'number' &&
+      Array.isArray(parsed.instruments)
+    ) {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export const INSTRUMENTS: Instrument[] = [
   ...BASE_INSTRUMENTS,
+  ...buildExtendedEquities(),
   ...buildDerivativeInstruments(),
 ];
 
 export const INSTRUMENT_MAP = new Map<number, Instrument>(
   INSTRUMENTS.map((inst) => [inst.token, inst]),
 );
+
+const SYMBOL_EXCHANGE_INDEX = new Map<string, Instrument>(
+  INSTRUMENTS.map((inst) => [`${inst.exchange}:${inst.symbol.toUpperCase()}`, inst]),
+);
+
+const persistedDynamic: Instrument[] = [];
+
+// Hydrate any previously discovered dynamic NSE/BSE stocks on startup
+for (const saved of loadPersistedDynamicInstruments()) {
+  const key = `${saved.exchange}:${saved.symbol.toUpperCase()}`;
+  if (!INSTRUMENT_MAP.has(saved.token) && !SYMBOL_EXCHANGE_INDEX.has(key)) {
+    INSTRUMENTS.push(saved);
+    INSTRUMENT_MAP.set(saved.token, saved);
+    SYMBOL_EXCHANGE_INDEX.set(key, saved);
+    persistedDynamic.push(saved);
+  }
+}
+
+export function registerMasterInstruments(items: Instrument[]): number {
+  let added = 0;
+  for (const inst of items) {
+    const key = `${inst.exchange}:${inst.symbol.toUpperCase()}`;
+    if (SYMBOL_EXCHANGE_INDEX.has(key) || INSTRUMENT_MAP.has(inst.token)) {
+      continue;
+    }
+    INSTRUMENTS.push(inst);
+    INSTRUMENT_MAP.set(inst.token, inst);
+    SYMBOL_EXCHANGE_INDEX.set(key, inst);
+    added++;
+  }
+  return added;
+}
+
+// Hydrate cached official NSE Equity + ETF master list synchronously if available
+const initialNseCache = loadCachedNseMaster();
+if (initialNseCache && initialNseCache.instruments.length > 0) {
+  registerMasterInstruments(initialNseCache.instruments);
+}
+
+async function fetchCsvWithFallback(
+  urls: string[],
+  timeoutMs: number,
+): Promise<string | null> {
+  for (const url of urls) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Accept: 'text/csv,text/plain,*/*',
+        },
+      });
+      if (res.ok) {
+        const text = await res.text();
+        if (text.length > 500) return text;
+      }
+    } catch {
+      // Try next mirror
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return null;
+}
+
+/**
+ * Fetches the official full NSE Equity list (EQUITY_L.csv, ~2,630+ stocks) and
+ * NSE ETF list (eq_etfseclist.csv, ~360+ ETFs), merges them into the instrument catalog,
+ * and persists a 24-hour disk cache for instant restarts.
+ */
+export async function syncNseInstrumentMaster(timeoutMs = 4500): Promise<number> {
+  const existingCache = loadCachedNseMaster();
+  if (
+    existingCache &&
+    existingCache.instruments.length >= 1500 &&
+    Date.now() - existingCache.updatedAt < NSE_MASTER_CACHE_TTL_MS
+  ) {
+    return registerMasterInstruments(existingCache.instruments);
+  }
+
+  const [eqCsv, etfCsv] = await Promise.all([
+    fetchCsvWithFallback(
+      [
+        'https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv',
+        'https://archives.nseindia.com/content/equities/EQUITY_L.csv',
+      ],
+      timeoutMs,
+    ),
+    fetchCsvWithFallback(
+      [
+        'https://nsearchives.nseindia.com/content/equities/eq_etfseclist.csv',
+        'https://archives.nseindia.com/content/equities/eq_etfseclist.csv',
+      ],
+      timeoutMs,
+    ),
+  ]);
+
+  const parsedEquities = eqCsv ? parseNseEquityCsv(eqCsv) : [];
+  const parsedEtfs = etfCsv ? parseNseEtfCsv(etfCsv) : [];
+  const combined = [...parsedEquities, ...parsedEtfs];
+
+  if (combined.length === 0) return 0;
+
+  const added = registerMasterInstruments(combined);
+
+  try {
+    const dir = path.dirname(NSE_MASTER_CACHE_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    const payload: NseMasterCachePayload = {
+      updatedAt: Date.now(),
+      instruments: combined,
+    };
+    fs.writeFileSync(NSE_MASTER_CACHE_FILE, JSON.stringify(payload), 'utf-8');
+  } catch {
+    // Ignore disk cache errors on read-only filesystems
+  }
+
+  return added;
+}
+
+export function findInstrumentByExchangeSymbol(
+  exchange: Exchange,
+  symbol: string,
+): Instrument | undefined {
+  return SYMBOL_EXCHANGE_INDEX.get(`${exchange}:${symbol.toUpperCase()}`);
+}
+
+export function registerDynamicInstrument(inst: Instrument): {
+  instrument: Instrument;
+  isNew: boolean;
+} {
+  const key = `${inst.exchange}:${inst.symbol.toUpperCase()}`;
+  const existingByKey = SYMBOL_EXCHANGE_INDEX.get(key);
+  if (existingByKey) {
+    return { instrument: existingByKey, isNew: false };
+  }
+  const existingByToken = INSTRUMENT_MAP.get(inst.token);
+  if (existingByToken) {
+    return { instrument: existingByToken, isNew: false };
+  }
+
+  INSTRUMENTS.push(inst);
+  INSTRUMENT_MAP.set(inst.token, inst);
+  SYMBOL_EXCHANGE_INDEX.set(key, inst);
+  persistedDynamic.push(inst);
+
+  try {
+    const dir = path.dirname(CUSTOM_INSTRUMENTS_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(
+      CUSTOM_INSTRUMENTS_FILE,
+      JSON.stringify(persistedDynamic.slice(-500), null, 2),
+      'utf-8',
+    );
+  } catch {
+    // Ignore persistence errors on read-only filesystems
+  }
+
+  return { instrument: inst, isNew: true };
+}
 
 export const DEFAULT_WATCHLISTS: Record<string, number[]> = {
   '1': [738561, 2953217, 408065, 341249, 1270529, 779521, 2714625, 424961],

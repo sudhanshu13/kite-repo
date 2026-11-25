@@ -231,3 +231,89 @@ test('searchInstruments matches multi-token futures, option strikes, and exchang
   assert.equal(optsOnly.length, 2);
   assert.ok(optsOnly.every((i) => i.instrumentType === 'CE' || i.instrumentType === 'PE'));
 });
+
+test('searchInstruments matches india cement with plurals, 1-edit typos (idia cement), and secondary related matches', () => {
+  const indianCatalog: Instrument[] = [
+    ...SAMPLE_INSTRUMENTS,
+    {
+      token: 71000001,
+      symbol: 'INDIACEM',
+      name: 'The India Cements Limited',
+      exchange: 'NSE',
+      lotSize: 1,
+      tickSize: 0.05,
+      basePrice: 365,
+      sector: 'Cement',
+      instrumentType: 'EQ',
+      underlying: 'INDIACEM',
+    },
+    {
+      token: 71000002,
+      symbol: 'INDIACEM',
+      name: 'The India Cements Limited (BSE)',
+      exchange: 'BSE',
+      lotSize: 1,
+      tickSize: 0.05,
+      basePrice: 365.2,
+      sector: 'Cement',
+      instrumentType: 'EQ',
+      underlying: 'INDIACEM',
+    },
+    {
+      token: 71000003,
+      symbol: 'INDCEMCAP',
+      name: 'India Cements Capital Limited (BSE)',
+      exchange: 'BSE',
+      lotSize: 1,
+      tickSize: 0.05,
+      basePrice: 22.4,
+      sector: 'Financial Services',
+      instrumentType: 'EQ',
+      underlying: 'INDCEMCAP',
+    },
+    {
+      token: 71000004,
+      symbol: 'INDIAGLYCO',
+      name: 'India Glycols Limited',
+      exchange: 'NSE',
+      lotSize: 1,
+      tickSize: 0.05,
+      basePrice: 1210,
+      sector: 'Chemicals',
+      instrumentType: 'EQ',
+      underlying: 'INDIAGLYCO',
+    },
+    {
+      token: 71000005,
+      symbol: 'INDIAMART',
+      name: 'Indiamart Intermesh Limited',
+      exchange: 'NSE',
+      lotSize: 1,
+      tickSize: 0.05,
+      basePrice: 2340,
+      sector: 'Internet',
+      instrumentType: 'EQ',
+      underlying: 'INDIAMART',
+    },
+  ];
+
+  // Exact multi-word query: INDIACEM NSE, INDIACEM BSE, INDCEMCAP first, then related INDIA* stocks
+  const exactRes = searchInstruments(indianCatalog, 'india cement');
+  assert.equal(exactRes[0]?.symbol, 'INDIACEM');
+  assert.equal(exactRes[0]?.exchange, 'NSE');
+  assert.equal(exactRes[1]?.symbol, 'INDIACEM');
+  assert.equal(exactRes[1]?.exchange, 'BSE');
+  assert.equal(exactRes[2]?.symbol, 'INDCEMCAP');
+  assert.ok(exactRes.some((i) => i.symbol === 'INDIAGLYCO'));
+  assert.ok(exactRes.some((i) => i.symbol === 'INDIAMART'));
+
+  // Plural query: "india cements"
+  const pluralRes = searchInstruments(indianCatalog, 'india cements');
+  assert.equal(pluralRes[0]?.symbol, 'INDIACEM');
+
+  // 1-character typo query: "idia cement"
+  const typoRes = searchInstruments(indianCatalog, 'idia cement');
+  assert.equal(typoRes[0]?.symbol, 'INDIACEM');
+  assert.equal(typoRes[0]?.exchange, 'NSE');
+});
+

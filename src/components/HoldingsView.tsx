@@ -632,7 +632,7 @@ export function HoldingsView({
           <>
             <div
               ref={tableContainerRef}
-              className="overflow-x-auto border-t border-[#EEEEEE] dark:border-[#282828]"
+              className="overflow-x-auto overflow-y-hidden border-t border-[#EEEEEE] dark:border-[#282828]"
             >
               <table className="w-full text-[13px] text-left border-collapse">
                 <thead>

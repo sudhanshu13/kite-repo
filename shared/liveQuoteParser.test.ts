@@ -108,3 +108,40 @@ test('deriveFuturesSnapshotFromSpot scales spot snapshot accurately by futures b
   assert.equal(fut.historyCloses.length, 3);
   assert.ok(fut.volume > 0);
 });
+
+test('parseYahooSearchQuotes parses NSE and BSE equities and ignores non-Indian listings', async () => {
+  const { hashDynamicInstrumentToken, parseYahooSearchQuotes } = await import('./liveQuoteParser.ts');
+  const parsed = parseYahooSearchQuotes({
+    quotes: [
+      {
+        symbol: 'SUZLON.NS',
+        longname: 'Suzlon Energy Limited',
+        exchange: 'NSI',
+        quoteType: 'EQUITY',
+        sectorDisp: 'Industrials',
+      },
+      {
+        symbol: 'SUZLON.BO',
+        shortname: 'SUZLON ENERGY LTD.',
+        exchange: 'BSE',
+        quoteType: 'EQUITY',
+      },
+      {
+        symbol: 'AAPL',
+        longname: 'Apple Inc.',
+        exchange: 'NMS',
+        quoteType: 'EQUITY',
+      },
+    ],
+  });
+
+  assert.equal(parsed.length, 2);
+  assert.equal(parsed[0].symbol, 'SUZLON');
+  assert.equal(parsed[0].exchange, 'NSE');
+  assert.equal(parsed[0].yahooSymbol, 'SUZLON.NS');
+  assert.equal(parsed[0].token, hashDynamicInstrumentToken('NSE', 'SUZLON'));
+  assert.equal(parsed[1].symbol, 'SUZLON');
+  assert.equal(parsed[1].exchange, 'BSE');
+  assert.ok(parsed[1].name.includes('(BSE)'));
+  assert.notEqual(parsed[0].token, parsed[1].token);
+});

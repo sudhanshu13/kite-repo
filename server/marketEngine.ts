@@ -1,4 +1,8 @@
-import { priceOptionBlackScholes } from '../shared/derivatives.ts';
+import {
+  priceOptionBlackScholes,
+  searchInstruments,
+  type SearchCategoryFilter,
+} from '../shared/derivatives.ts';
 import { round2, roundTick, type ParsedLiveQuoteSnapshot } from '../shared/liveQuoteParser.ts';
 import { evaluateTechnicalSummary } from '../shared/technicals.ts';
 import type {
@@ -8,8 +12,17 @@ import type {
   OverallTechnicalRating,
   TechnicalSummary,
 } from '../shared/types.ts';
-import { INSTRUMENT_MAP, INSTRUMENTS } from './instruments.ts';
-import { fetchLiveMarketSnapshots } from './liveFeed.ts';
+import {
+  CORE_LIVE_SYNC_TOKENS,
+  INSTRUMENT_MAP,
+  INSTRUMENTS,
+  registerDynamicInstrument,
+} from './instruments.ts';
+import {
+  fetchLiveMarketSnapshots,
+  fetchSingleInstrumentSnapshot,
+  searchYahooIndianInstruments,
+} from './liveFeed.ts';
 
 function buildDepth(
   ltp: number,
@@ -42,12 +55,26 @@ export class MarketEngine {
   private quotes = new Map<number, MarketQuote>();
   private priceHistory = new Map<number, number[]>();
   private biases = new Map<number, number>();
+  private liveSyncedTokens = new Set<number>();
+  private activeInterestTokens = new Set<number>(CORE_LIVE_SYNC_TOKENS);
   private tickCounter = 0;
   private liveSynced = false;
   private marketOpen = false;
 
   constructor() {
     this.seedFallbackMarket();
+  }
+
+  public trackInterestTokens(tokens: number[]) {
+    for (const token of tokens) {
+      const inst = INSTRUMENT_MAP.get(token);
+      if (!inst) continue;
+      if (inst.yahooSymbol) {
+        this.activeInterestTokens.add(token);
+      } else if (inst.derivedFromToken) {
+        this.activeInterestTokens.add(inst.derivedFromToken);
+      }
+    }
   }
 
   public isLiveSynced(): boolean {
@@ -61,6 +88,11 @@ export class MarketEngine {
   private seedFallbackMarket() {
     const now = Date.now();
     INSTRUMENTS.forEach((inst, idx) => {
+      // Keep startup fast & memory lean: only pre-seed core/curated/F&O instruments;
+      // the ~3,000 NSE CSV master stocks seed/sync lazily on demand when searched, watched, or traded.
+      if (inst.token >= 70_000_000 && !CORE_LIVE_SYNC_TOKENS.has(inst.token)) {
+        return;
+      }
       const isOption = inst.instrumentType === 'CE' || inst.instrumentType === 'PE';
       const bias = ((idx % 5) - 2) * 0.00025;
       this.biases.set(inst.token, bias);
@@ -157,8 +189,62 @@ export class MarketEngine {
     });
   }
 
+  private seedSingleFallbackInstrument(inst: Instrument, idx = 1) {
+    if (this.quotes.has(inst.token)) return;
+    const now = Date.now();
+    const isOption = inst.instrumentType === 'CE' || inst.instrumentType === 'PE';
+    const bias = ((idx % 5) - 2) * 0.00025;
+    this.biases.set(inst.token, bias);
+
+    const history: number[] = [];
+    let p = Math.max(inst.tickSize, inst.basePrice) * (1 - bias * 60);
+    for (let i = 0; i < 80; i++) {
+      const wave = Math.sin((i + idx * 7) * 0.19) * 0.0012;
+      const drift = bias + Math.cos((i + idx) * 0.07) * 0.0005;
+      p = Math.max(inst.tickSize, p * (1 + drift + wave));
+      history.push(roundTick(p, inst.tickSize));
+    }
+    const ltp = roundTick(Math.max(inst.tickSize, inst.basePrice), inst.tickSize);
+    const prevClose = roundTick(history[history.length - 12] || ltp, inst.tickSize);
+    const open = roundTick(history[history.length - 8] || prevClose, inst.tickSize);
+    history[history.length - 1] = ltp;
+
+    const high = Math.max(open, ltp, prevClose);
+    const low = Math.min(open, ltp, prevClose);
+    const change = round2(ltp - prevClose);
+    const changePercent = prevClose > 0 ? round2((change / prevClose) * 100) : 0;
+
+    this.priceHistory.set(inst.token, history);
+    this.quotes.set(inst.token, {
+      token: inst.token,
+      symbol: inst.symbol,
+      exchange: inst.exchange,
+      ltp,
+      open,
+      high: roundTick(high, inst.tickSize),
+      low: roundTick(low, inst.tickSize),
+      close: prevClose,
+      change,
+      changePercent,
+      volume: inst.isIndex ? 0 : Math.floor(150000 + (idx % 20) * 45000),
+      averagePrice: roundTick((high + low + ltp) / 3, inst.tickSize),
+      lastQty: inst.isIndex ? 0 : Math.max(inst.lotSize, 5),
+      lowerCircuit: roundTick(prevClose * (isOption ? 0.05 : 0.9), inst.tickSize),
+      upperCircuit: roundTick(prevClose * (isOption ? 2.5 : 1.1), inst.tickSize),
+      week52High: roundTick(ltp * 1.18, inst.tickSize),
+      week52Low: Math.max(inst.tickSize, roundTick(ltp * 0.76, inst.tickSize)),
+      timestamp: now,
+      direction: change >= 0 ? 'up' : 'down',
+      depth: inst.isIndex ? { buy: [], sell: [] } : buildDepth(ltp, inst.tickSize, idx + 11),
+    });
+  }
+
   public async syncFromLiveFeed(mode: 'full' | 'intraday'): Promise<MarketQuote[]> {
-    const snapshots = await fetchLiveMarketSnapshots(INSTRUMENTS, mode);
+    const snapshots = await fetchLiveMarketSnapshots(
+      INSTRUMENTS,
+      mode,
+      this.activeInterestTokens,
+    );
     if (snapshots.length === 0) {
       return [];
     }
@@ -168,10 +254,100 @@ export class MarketEngine {
 
     const updated: MarketQuote[] = [];
     for (const snap of snapshots) {
+      this.liveSyncedTokens.add(snap.token);
       const q = this.applyLiveSnapshot(snap, mode === 'full');
       if (q) updated.push(q);
     }
     return updated;
+  }
+
+  public ensureQuoteExists(token: number): MarketQuote | undefined {
+    const existing = this.quotes.get(token);
+    if (existing) return existing;
+    const inst = INSTRUMENT_MAP.get(token);
+    if (!inst) return undefined;
+    this.seedSingleFallbackInstrument(inst, token % 97);
+    return this.quotes.get(token);
+  }
+
+  public async getOrFetchLiveQuote(token: number): Promise<MarketQuote | undefined> {
+    const inst = INSTRUMENT_MAP.get(token);
+    if (!inst) return undefined;
+    this.trackInterestTokens([token]);
+    await this.ensureLiveQuotes([token]);
+    return this.ensureQuoteExists(token);
+  }
+
+  public async ensureLiveQuotes(tokens: number[]): Promise<MarketQuote[]> {
+    const toFetch = tokens
+      .map((t) => INSTRUMENT_MAP.get(t))
+      .filter(
+        (inst): inst is Instrument =>
+          Boolean(inst && inst.yahooSymbol && !this.liveSyncedTokens.has(inst.token)),
+      )
+      .slice(0, 12);
+
+    if (toFetch.length === 0) return [];
+
+    const results = await Promise.all(
+      toFetch.map(async (inst) => {
+        const snap = await fetchSingleInstrumentSnapshot(inst, 'intraday', 2500);
+        if (!snap) return null;
+        this.liveSyncedTokens.add(inst.token);
+        this.activeInterestTokens.add(inst.token);
+        this.seedSingleFallbackInstrument(inst, inst.token % 97);
+        return this.applyLiveSnapshot(snap, true);
+      }),
+    );
+    return results.filter((q): q is MarketQuote => q !== null);
+  }
+
+  public async searchInstrumentsWithLiveDiscovery(
+    query: string,
+    options?: { category?: SearchCategoryFilter; limit?: number; live?: boolean },
+  ): Promise<{ instruments: Instrument[]; quotes: MarketQuote[] }> {
+    const category = options?.category ?? 'all';
+    const limit = options?.limit ?? 50;
+    const trimmed = query.trim();
+    if (!trimmed) {
+      return { instruments: [], quotes: [] };
+    }
+
+    // Check if query looks purely like an F&O derivative search (skip remote equity lookup)
+    const lower = trimmed.toLowerCase();
+    const isDerivativeOnly =
+      category === 'fut' ||
+      category === 'opt' ||
+      /\b(fut|future|futures|ce|pe|call|put|nfo|bfo)\b/.test(lower) ||
+      /\d{4,5}\s*(ce|pe)?$/i.test(lower);
+
+    if (options?.live && !isDerivativeOnly && trimmed.length >= 2) {
+      const remoteMatches = await searchYahooIndianInstruments(trimmed);
+      for (const candidate of remoteMatches) {
+        registerDynamicInstrument(candidate);
+      }
+    }
+
+    const matched = searchInstruments(INSTRUMENTS, trimmed, { category, limit });
+
+    // Fetch live quotes for top matching NSE/BSE equities that haven't synced yet
+    if (options?.live) {
+      const equityTokens = matched
+        .filter((i) => i.yahooSymbol && !this.liveSyncedTokens.has(i.token))
+        .slice(0, 10)
+        .map((i) => i.token);
+      if (equityTokens.length > 0) {
+        await this.ensureLiveQuotes(equityTokens);
+      }
+    }
+
+    const matchedQuotes: MarketQuote[] = [];
+    for (const inst of matched) {
+      const q = this.quotes.get(inst.token);
+      if (q) matchedQuotes.push(q);
+    }
+
+    return { instruments: matched, quotes: matchedQuotes };
   }
 
   private applyLiveSnapshot(
@@ -406,9 +582,11 @@ export class MarketEngine {
 
   public getTechnicalSummary(token: number): TechnicalSummary | null {
     const inst = INSTRUMENT_MAP.get(token);
+    if (!inst) return null;
+    this.ensureQuoteExists(token);
     const quote = this.quotes.get(token);
     const prices = this.priceHistory.get(token);
-    if (!inst || !quote || !prices) return null;
+    if (!quote || !prices) return null;
 
     return evaluateTechnicalSummary({
       token: inst.token,

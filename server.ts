@@ -4,14 +4,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { WebSocket, WebSocketServer } from 'ws';
-import { searchInstruments } from './shared/derivatives.ts';
+import {
+  searchInstruments,
+  type SearchCategoryFilter,
+} from './shared/derivatives.ts';
 import type {
   AdminCreateUserRequest,
   AdminUpdateUserRequest,
   AuthUser,
   OrderRequest,
 } from './shared/types.ts';
-import { INSTRUMENT_MAP } from './server/instruments.ts';
+import { INSTRUMENT_MAP, syncNseInstrumentMaster } from './server/instruments.ts';
 import { MarketEngine } from './server/marketEngine.ts';
 import { TradingStore } from './server/store.ts';
 
@@ -54,7 +57,10 @@ async function startServer() {
 
   const market = new MarketEngine();
   await Promise.race([
-    market.syncFromLiveFeed('full'),
+    Promise.all([
+      syncNseInstrumentMaster(4000),
+      market.syncFromLiveFeed('full'),
+    ]),
     new Promise<void>((resolve) => setTimeout(resolve, 4500)),
   ]);
   const store = new TradingStore(market);
@@ -186,14 +192,30 @@ async function startServer() {
   });
 
   // --- Market Data & Technicals Routes ---
-  app.get('/api/instruments', requireAuth, (req, res) => {
+  app.get('/api/instruments', requireAuth, async (req, res) => {
     const q = String(req.query.q || '').trim();
     const list = market.getInstruments();
     if (!q) {
       res.json({ instruments: list });
       return;
     }
-    const filtered = searchInstruments(list, q, { limit: 40 });
+
+    const rawCat = String(req.query.category || 'all').toLowerCase();
+    const category: SearchCategoryFilter =
+      rawCat === 'eq' || rawCat === 'fut' || rawCat === 'opt' ? rawCat : 'all';
+    const live = req.query.live === '1' || req.query.live === 'true';
+
+    if (live) {
+      const result = await market.searchInstrumentsWithLiveDiscovery(q, {
+        category,
+        limit: 50,
+        live: true,
+      });
+      res.json(result);
+      return;
+    }
+
+    const filtered = searchInstruments(list, q, { category, limit: 50 });
     res.json({ instruments: filtered });
   });
 
@@ -208,8 +230,29 @@ async function startServer() {
     });
   });
 
-  app.get('/api/technicals/:token', requireAuth, (req, res) => {
+  app.get('/api/quotes/:token', requireAuth, async (req, res) => {
     const token = Number(req.params.token);
+    if (!Number.isFinite(token) || token <= 0) {
+      res.status(400).json({ error: 'Invalid instrument token' });
+      return;
+    }
+    const inst = INSTRUMENT_MAP.get(token);
+    if (!inst) {
+      res.status(404).json({ error: 'Instrument not found' });
+      return;
+    }
+    const quote = await market.getOrFetchLiveQuote(token);
+    if (!quote) {
+      res.status(404).json({ error: 'Quote unavailable' });
+      return;
+    }
+    res.json({ quote, instrument: inst });
+  });
+
+  app.get('/api/technicals/:token', requireAuth, async (req, res) => {
+    const token = Number(req.params.token);
+    market.trackInterestTokens([token]);
+    await market.ensureLiveQuotes([token]);
     const summary = market.getTechnicalSummary(token);
     if (!summary) {
       res.status(404).json({ error: 'Instrument not found' });
@@ -232,10 +275,21 @@ async function startServer() {
       res.status(404).json({ error: 'Portfolio not found' });
       return;
     }
+    const activeTokens = Array.from(
+      new Set([
+        ...Object.values(portfolio.watchlists).flat(),
+        ...portfolio.holdings.map((h) => h.token),
+        ...portfolio.positions.map((p) => p.token),
+      ]),
+    );
+    market.trackInterestTokens(activeTokens);
+    for (const tok of activeTokens) {
+      market.ensureQuoteExists(tok);
+    }
     res.json({ portfolio });
   });
 
-  app.put('/api/watchlists/:id', requireAuth, (req, res) => {
+  app.put('/api/watchlists/:id', requireAuth, async (req, res) => {
     const user = (req as express.Request & { authUser: AuthUser }).authUser;
     const id = String(req.params.id);
     const { tokens } = req.body as { tokens?: number[] };
@@ -243,8 +297,17 @@ async function startServer() {
       res.status(400).json({ error: 'Invalid watchlist ID or tokens payload.' });
       return;
     }
-    const portfolio = store.updateWatchlist(user.userId, id, tokens.map(Number));
-    res.json({ portfolio });
+    const numericTokens = tokens.map(Number);
+    market.trackInterestTokens(numericTokens);
+    const syncedQuotes = await market.ensureLiveQuotes(numericTokens);
+    if (syncedQuotes.length > 0) {
+      broadcastTicks(syncedQuotes);
+    }
+    const watchlistQuotes = numericTokens
+      .map((t) => market.ensureQuoteExists(t))
+      .filter((q): q is NonNullable<typeof q> => Boolean(q));
+    const portfolio = store.updateWatchlist(user.userId, id, numericTokens);
+    res.json({ portfolio, quotes: watchlistQuotes });
   });
 
   const userSockets = new Map<string, Set<WebSocket>>();
@@ -327,9 +390,12 @@ async function startServer() {
     });
   });
 
-  app.post('/api/orders', requireAuth, (req, res) => {
+  app.post('/api/orders', requireAuth, async (req, res) => {
     const user = (req as express.Request & { authUser: AuthUser }).authUser;
     const body = req.body as OrderRequest;
+    if (Number.isFinite(Number(body?.token))) {
+      await market.getOrFetchLiveQuote(Number(body.token));
+    }
     const result = store.placeOrder(user.userId, body, market);
     if (!result.ok) {
       res.status(400).json({ error: result.error });

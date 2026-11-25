@@ -611,7 +611,17 @@ export default function App() {
       body: JSON.stringify({ tokens }),
     });
     if (res.ok) {
-      const data = (await res.json()) as { portfolio: PortfolioState };
+      const data = (await res.json()) as {
+        portfolio: PortfolioState;
+        quotes?: MarketQuote[];
+      };
+      if (Array.isArray(data.quotes) && data.quotes.length > 0) {
+        setQuotes((prev) => {
+          const next = { ...prev };
+          for (const q of data.quotes!) next[q.token] = q;
+          return next;
+        });
+      }
       setPortfolio(data.portfolio);
       const sigRes = await apiFetch('/api/technicals/batch', {
         method: 'POST',
@@ -800,8 +810,68 @@ export default function App() {
     return { ok: true, message: data.message };
   }
 
+  const handleMergeDiscoveredInstruments = useCallback(
+    (discovered: Instrument[], discoveredQuotes: MarketQuote[]) => {
+      if (discovered.length > 0) {
+        setInstruments((prev) => {
+          const seen = new Set(prev.map((item) => item.token));
+          const additions = discovered.filter((item) => !seen.has(item.token));
+          return additions.length > 0 ? [...prev, ...additions] : prev;
+        });
+      }
+      if (discoveredQuotes.length > 0) {
+        setQuotes((prev) => {
+          const next = { ...prev };
+          for (const q of discoveredQuotes) next[q.token] = q;
+          return next;
+        });
+      }
+    },
+    [],
+  );
+
+  const ensureClientQuote = useCallback(
+    async (token: number) => {
+      if (quotes[token]) return;
+      try {
+        const res = await apiFetch(`/api/quotes/${token}`);
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          quote?: MarketQuote;
+          instrument?: Instrument;
+        };
+        if (data.instrument) {
+          setInstruments((prev) =>
+            prev.some((i) => i.token === data.instrument!.token)
+              ? prev
+              : [...prev, data.instrument!],
+          );
+        }
+        if (data.quote) {
+          setQuotes((prev) => ({ ...prev, [data.quote!.token]: data.quote! }));
+        }
+      } catch {
+        // Ignore transient fetch errors
+      }
+    },
+    [quotes],
+  );
+
+  const handleOpenOrderModal = useCallback(
+    (token: number, side: OrderSide) => {
+      setOrderModal({ token, side });
+      if (!quotes[token]) {
+        void ensureClientQuote(token);
+      }
+    },
+    [quotes, ensureClientQuote],
+  );
+
   function handleSelectSymbolForTechnicals(token: number) {
     setSelectedToken(token);
+    if (!quotes[token]) {
+      void ensureClientQuote(token);
+    }
     if (!terminalMode) {
       setActiveTab('technicals');
     }
@@ -841,7 +911,7 @@ export default function App() {
     workspaces.find((w) => w.id === activeWorkspaceId) ?? DEFAULT_WORKSPACE;
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FFFFFF] dark:bg-[#121212] text-[#444444] dark:text-[#E0E0E0]">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col bg-[#FFFFFF] dark:bg-[#121212] text-[#444444] dark:text-[#E0E0E0]">
       <TopBar
         user={user}
         activeTab={resolvedTab}
@@ -874,8 +944,8 @@ export default function App() {
           Loading portfolio and live market stream...
         </div>
       ) : (
-        <div className="flex-1 flex flex-col lg:flex-row min-h-0">
-          <div className={mobilePane === 'watchlist' ? 'block lg:block' : 'hidden lg:block'}>
+        <div className="flex-1 flex flex-col lg:flex-row min-h-0 lg:overflow-hidden">
+          <div className={`lg:h-full ${mobilePane === 'watchlist' ? 'block lg:block' : 'hidden lg:block'}`}>
             <MarketWatch
               instruments={instruments}
               quotes={quotes}
@@ -886,12 +956,13 @@ export default function App() {
               onSelectWatchlist={setActiveWatchlistId}
               onSelectSymbolForTechnicals={handleSelectSymbolForTechnicals}
               onUpdateWatchlist={handleUpdateWatchlist}
-              onOpenOrderModal={(token, side) => setOrderModal({ token, side })}
+              onOpenOrderModal={handleOpenOrderModal}
+              onMergeDiscoveredInstruments={handleMergeDiscoveredInstruments}
             />
           </div>
 
           <main
-            className={`flex-1 lg:h-[calc(100vh-50px)] overflow-y-auto bg-[#FFFFFF] dark:bg-[#121212] ${
+            className={`flex-1 min-w-0 lg:h-full overflow-y-auto bg-[#FFFFFF] dark:bg-[#121212] ${
               mobilePane === 'workspace' ? 'block' : 'hidden lg:block'
             }`}
           >
@@ -906,7 +977,7 @@ export default function App() {
                 selectedToken={selectedToken}
                 onSelectToken={setSelectedToken}
                 onUpdateWorkspace={handleUpdateWorkspace}
-                onOpenOrderModal={(token, side) => setOrderModal({ token, side })}
+                onOpenOrderModal={handleOpenOrderModal}
                 onCancelOrder={handleCancelOrder}
                 onExitPosition={handleExitPosition}
                 onExitTerminal={() => setTerminalMode(false)}
@@ -923,7 +994,7 @@ export default function App() {
                     isAdmin={isAdmin}
                     onNavigate={setActiveTab}
                     onSelectSymbolForTechnicals={handleSelectSymbolForTechnicals}
-                    onOpenOrderModal={(token, side) => setOrderModal({ token, side })}
+                    onOpenOrderModal={handleOpenOrderModal}
                   />
                 )}
 
@@ -931,7 +1002,7 @@ export default function App() {
               <TechnicalsView
                 instrument={instrumentMap.get(selectedToken)}
                 quote={quotes[selectedToken]}
-                onOpenOrderModal={(token, side) => setOrderModal({ token, side })}
+                onOpenOrderModal={handleOpenOrderModal}
               />
             )}
 
@@ -946,7 +1017,7 @@ export default function App() {
               <HoldingsView
                 holdings={portfolio.holdings}
                 quotes={quotes}
-                onOpenOrderModal={(token, side) => setOrderModal({ token, side })}
+                onOpenOrderModal={handleOpenOrderModal}
                 onSelectSymbolForTechnicals={handleSelectSymbolForTechnicals}
                 onUpdateHolding={handleUpdateHolding}
                 onDeleteHolding={handleDeleteHolding}
@@ -958,7 +1029,7 @@ export default function App() {
               <PositionsView
                 positions={portfolio.positions}
                 quotes={quotes}
-                onOpenOrderModal={(token, side) => setOrderModal({ token, side })}
+                onOpenOrderModal={handleOpenOrderModal}
                 onExitPosition={handleExitPosition}
                 onConvertPosition={handleConvertPosition}
                 onUpdatePosition={handleUpdatePosition}
