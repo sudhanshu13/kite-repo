@@ -271,9 +271,12 @@ export function TopBar({
       ref={headerRef}
       className="shrink-0 select-none z-20 bg-white dark:bg-[#181818] border-b border-[#EEEEEE] dark:border-[#282828] shadow-[0_1px_3px_rgba(0,0,0,0.03)]"
     >
-      <header className="h-[50px] flex items-center justify-between">
+      <header
+        data-testid="kite-header"
+        className="h-[50px] w-full max-w-[1280px] mx-auto flex items-center justify-between"
+      >
         {/* Left Zone: Indices aligned over MarketWatch rail */}
-        <div className="hidden lg:flex items-center justify-between lg:w-[390px] xl:w-[410px] shrink-0 h-full px-4 border-r border-[#EEEEEE] dark:border-[#282828] text-[12px]">
+        <div className="hidden lg:flex items-center justify-between lg:w-[375px] xl:w-[385px] shrink-0 h-full px-3.5 border-r border-[#EEEEEE] dark:border-[#282828] text-[11.5px]">
           <div className="flex items-center gap-1.5 whitespace-nowrap">
             <span className="font-semibold text-[#444444] dark:text-[#E0E0E0] tracking-tight">
               NIFTY 50
@@ -308,8 +311,8 @@ export function TopBar({
         </div>
 
         {/* Right Zone: Kite Logo + Joined Workspace/Terminal Selector on Left, Exact Kite Menu + Cart + Bell + Profile on Right */}
-        <div className="flex-1 flex items-center justify-between gap-3 px-4 lg:px-7 min-w-0 h-full">
-          <div className="flex items-center gap-4 xl:gap-5 min-w-0">
+        <div className="flex-1 flex items-center justify-between gap-3 px-4 lg:px-6 min-w-0 h-full">
+          <div className="flex items-center gap-3.5 xl:gap-4 min-w-0">
             <button
               type="button"
               onClick={() => {
@@ -334,7 +337,7 @@ export function TopBar({
                 aria-expanded={openMenu === 'workspace'}
                 aria-haspopup="menu"
                 aria-label="Select workspace"
-                className="h-full min-w-[140px] xl:min-w-[175px] px-3 flex items-center justify-between gap-2 text-[12.5px] font-normal text-[#444444] dark:text-[#E0E0E0] hover:bg-[#FAFAFA] dark:hover:bg-[#252525] border-r border-[#EEEEEE] dark:border-[#303030] cursor-pointer transition-colors"
+                className="h-full min-w-[126px] xl:min-w-[144px] px-3 flex items-center justify-between gap-2 text-[12.5px] font-normal text-[#444444] dark:text-[#E0E0E0] hover:bg-[#FAFAFA] dark:hover:bg-[#252525] border-r border-[#EEEEEE] dark:border-[#303030] cursor-pointer transition-colors"
               >
                 <span className="truncate">{activeWorkspace?.name ?? 'Default'}</span>
                 <ChevronDown
@@ -476,10 +479,12 @@ export function TopBar({
           </div>
 
           {/* Right-Aligned Kite Menu Items + Cart + Bell + User Avatar/ID */}
-          <div className="flex items-center gap-4 xl:gap-5 ml-auto min-w-0 h-full">
+          <div className="flex items-center gap-3.5 xl:gap-4 ml-auto min-w-0 h-full">
             <nav
               aria-label="Primary sections"
-              className="hidden lg:flex items-center gap-5 xl:gap-6 h-full"
+              className={`hidden lg:flex items-center h-full ${
+                visibleNavItems.length > 6 ? 'gap-3.5 xl:gap-4' : 'gap-4 xl:gap-5'
+              }`}
             >
               {visibleNavItems.map((item) => {
                 const isActive = !terminalMode && activeTab === item.id;
@@ -517,7 +522,7 @@ export function TopBar({
             <div className="hidden lg:block h-4 w-px bg-[#EEEEEE] dark:bg-[#282828] shrink-0" />
 
             {/* Kite Utility Icons: Cart + Notifications Bell + User Avatar/ID */}
-            <div className="flex items-center gap-3 xl:gap-4 shrink-0">
+            <div className="flex items-center gap-2.5 xl:gap-3 shrink-0">
               {/* Cart (Basket Orders) */}
               <div className="relative">
                 <button

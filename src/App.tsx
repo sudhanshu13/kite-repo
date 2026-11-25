@@ -911,7 +911,7 @@ export default function App() {
     workspaces.find((w) => w.id === activeWorkspaceId) ?? DEFAULT_WORKSPACE;
 
   return (
-    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col bg-[#FFFFFF] dark:bg-[#121212] text-[#444444] dark:text-[#E0E0E0]">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col bg-[#F9F9F9] dark:bg-[#0D0D0D] text-[#444444] dark:text-[#E0E0E0]">
       <TopBar
         user={user}
         activeTab={resolvedTab}
@@ -940,11 +940,14 @@ export default function App() {
       />
 
       {!portfolio ? (
-        <div className="flex-1 flex items-center justify-center text-xs text-[#9B9B9B]">
+        <div className="flex-1 w-full max-w-[1280px] mx-auto flex items-center justify-center bg-[#FFFFFF] dark:bg-[#121212] xl:border-x xl:border-[#EEEEEE] dark:xl:border-[#242424] text-xs text-[#9B9B9B]">
           Loading portfolio and live market stream...
         </div>
       ) : (
-        <div className="flex-1 flex flex-col lg:flex-row min-h-0 lg:overflow-hidden">
+        <div
+          data-testid="kite-shell"
+          className="flex-1 flex flex-col lg:flex-row min-h-0 lg:overflow-hidden w-full max-w-[1280px] mx-auto bg-[#FFFFFF] dark:bg-[#121212] xl:border-x xl:border-[#EEEEEE] dark:xl:border-[#242424] xl:shadow-[0_0_2px_rgba(0,0,0,0.04)]"
+        >
           <div className={`lg:h-full ${mobilePane === 'watchlist' ? 'block lg:block' : 'hidden lg:block'}`}>
             <MarketWatch
               instruments={instruments}

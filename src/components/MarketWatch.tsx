@@ -426,7 +426,7 @@ export function MarketWatch({
   return (
     <aside
       aria-label="Marketwatch"
-      className="w-full lg:w-[390px] xl:w-[410px] shrink-0 bg-[#FCFCFC] dark:bg-[#141414] border-b lg:border-b-0 lg:border-r border-[#EEEEEE] dark:border-[#282828] flex flex-col lg:h-full"
+      className="w-full lg:w-[375px] xl:w-[385px] shrink-0 bg-[#FFFFFF] dark:bg-[#141414] border-b lg:border-b-0 lg:border-r border-[#EEEEEE] dark:border-[#282828] flex flex-col lg:h-full"
     >
       {/* Top Bordered Search Box (Exact Kite Style with Ctrl+K & Filter Sliders) */}
       <div ref={searchContainerRef} className="relative px-3 pt-2.5 pb-1.5">
