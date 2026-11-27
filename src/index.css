@@ -88,3 +88,38 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(155, 155, 155, 0.55);
 }
+
+/* Global Kite Orange (#FF5722) hover and active/clicked text color */
+a:not([class*="text-white"]):hover,
+a:not([class*="text-white"]):active,
+button:not([class*="text-white"]):not(:disabled):hover,
+button:not([class*="text-white"]):not(:disabled):active,
+[role="tab"]:not([class*="text-white"]):hover,
+[role="tab"]:not([class*="text-white"]):active,
+[role="tab"][aria-selected="true"]:not([class*="text-white"]),
+[aria-current="page"]:not([class*="text-white"]),
+[role="menuitem"]:not([class*="text-white"]):hover,
+[role="menuitem"]:not([class*="text-white"]):active,
+select:hover,
+select:active,
+label:has(input[type="radio"]):hover,
+label:has(input[type="radio"]):active,
+label:has(input[type="radio"]:checked),
+label:has(input[type="checkbox"]):hover,
+label:has(input[type="checkbox"]):active {
+  color: #ff5722 !important;
+}
+
+button:not([class*="text-white"]):not(:disabled):hover span:not([aria-hidden="true"]):not([class*="bg-"]),
+button:not([class*="text-white"]):not(:disabled):active span:not([aria-hidden="true"]):not([class*="bg-"]),
+a:not([class*="text-white"]):hover span:not([aria-hidden="true"]):not([class*="bg-"]),
+a:not([class*="text-white"]):active span:not([aria-hidden="true"]):not([class*="bg-"]),
+[role="tab"][aria-selected="true"]:not([class*="text-white"]) span:not([aria-hidden="true"]):not([class*="bg-"]),
+label:has(input[type="radio"]):hover span:not([aria-hidden="true"]),
+label:has(input[type="radio"]):active span:not([aria-hidden="true"]),
+label:has(input[type="radio"]:checked) span:not([aria-hidden="true"]),
+label:has(input[type="checkbox"]):hover span:not([aria-hidden="true"]),
+label:has(input[type="checkbox"]):active span:not([aria-hidden="true"]) {
+  color: #ff5722 !important;
+}
+

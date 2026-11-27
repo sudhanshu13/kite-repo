@@ -232,7 +232,7 @@ export function BidsView({ onNotify }: BidsViewProps) {
                 className={`relative pb-3 text-[13px] whitespace-nowrap cursor-pointer transition-colors ${
                   active
                     ? 'text-[#FF5722] font-medium'
-                    : 'text-[#666666] dark:text-[#A0A0A0] hover:text-[#444444] dark:hover:text-[#E0E0E0]'
+                    : 'text-[#666666] dark:text-[#A0A0A0] hover:text-[#FF5722] dark:hover:text-[#FF5722]'
                 }`}
               >
                 {label}

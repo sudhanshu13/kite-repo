@@ -36,7 +36,7 @@ export function OrderModal({
   const [product, setProduct] = useState<ProductType>(
     isDerivative ? 'NRML' : 'CNC',
   );
-  const [orderType, setOrderType] = useState<OrderType>('MARKET');
+  const [orderType, setOrderType] = useState<OrderType>('CUSTOM');
   const [quantityStr, setQuantityStr] = useState<string>(
     String(instrument.lotSize || 1),
   );
@@ -288,8 +288,8 @@ export function OrderModal({
               <input
                 id="order-price"
                 type="number"
-                step="0.05"
-                min="0.05"
+                step="0.01"
+                min="0.01"
                 disabled={orderType === 'MARKET' || orderType === 'SL-M'}
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
@@ -307,8 +307,8 @@ export function OrderModal({
               <input
                 id="order-trigger"
                 type="number"
-                step="0.05"
-                min="0.05"
+                step="0.01"
+                min="0.01"
                 disabled={orderType === 'MARKET' || orderType === 'LIMIT' || orderType === 'CUSTOM'}
                 value={triggerPrice}
                 onChange={(e) => setTriggerPrice(e.target.value)}
@@ -323,7 +323,7 @@ export function OrderModal({
               Order Type
             </span>
             <div className="grid grid-cols-5 gap-1.5">
-              {(['MARKET', 'LIMIT', 'CUSTOM', 'SL', 'SL-M'] as OrderType[]).map((t) => (
+              {(['CUSTOM', 'MARKET', 'LIMIT', 'SL', 'SL-M'] as OrderType[]).map((t) => (
                 <button
                   key={t}
                   type="button"

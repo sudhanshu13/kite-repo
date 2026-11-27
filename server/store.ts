@@ -117,9 +117,12 @@ function createSeedPortfolio(
   const sbinLtp = livePrice(779521, sbinInst.basePrice);
   const niftyFutLtp = livePrice(14893570, niftyFutInst.basePrice);
 
-  const h1Invested = Math.round(15 * (relLtp * 0.96) * 100) / 100;
-  const h2Invested = Math.round(6 * (tcsLtp * 0.97) * 100) / 100;
-  const h3Invested = Math.round(12 * (hdfcLtp * 1.015) * 100) / 100;
+  const relAvg = Math.round(relLtp * 0.96 * 100) / 100;
+  const tcsAvg = Math.round(tcsLtp * 0.97 * 100) / 100;
+  const hdfcAvg = Math.round(hdfcLtp * 1.015 * 100) / 100;
+  const h1Invested = Math.round(15 * relAvg * 100) / 100;
+  const h2Invested = Math.round(6 * tcsAvg * 100) / 100;
+  const h3Invested = Math.round(12 * hdfcAvg * 100) / 100;
   const holdingsMargin = Math.round((h1Invested + h2Invested + h3Invested) * 100) / 100;
 
   // Seeded open positions (MIS intraday long/short + NFO NRML futures)
@@ -215,7 +218,7 @@ function createSeedPortfolio(
         symbol: relInst.symbol,
         exchange: relInst.exchange,
         quantity: 15,
-        averagePrice: Math.round(relLtp * 0.96 * 100) / 100,
+        averagePrice: relAvg,
         investedValue: h1Invested,
         t1Quantity: 0,
       },
@@ -224,7 +227,7 @@ function createSeedPortfolio(
         symbol: tcsInst.symbol,
         exchange: tcsInst.exchange,
         quantity: 6,
-        averagePrice: Math.round(tcsLtp * 0.97 * 100) / 100,
+        averagePrice: tcsAvg,
         investedValue: h2Invested,
         t1Quantity: 0,
       },
@@ -233,7 +236,7 @@ function createSeedPortfolio(
         symbol: hdfcInst.symbol,
         exchange: hdfcInst.exchange,
         quantity: 12,
-        averagePrice: Math.round(hdfcLtp * 1.015 * 100) / 100,
+        averagePrice: hdfcAvg,
         investedValue: h3Invested,
         t1Quantity: 0,
       },
@@ -400,6 +403,13 @@ export class TradingStore {
       if (this.market?.isLiveSynced() && user.portfolio.kiteApiConfig.mode === 'SIMULATED_FEED') {
         user.portfolio.kiteApiConfig.mode = 'LIVE_MARKET_FEED';
         dirty = true;
+      }
+      for (const h of user.portfolio.holdings) {
+        const expected = Math.round(h.quantity * h.averagePrice * 100) / 100;
+        if (Math.abs(h.investedValue - expected) > 0 && Math.abs(h.investedValue - expected) <= 0.1) {
+          h.investedValue = expected;
+          dirty = true;
+        }
       }
     }
 

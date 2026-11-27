@@ -192,8 +192,8 @@ export function TerminalView({
                   idx > 0 ? 'border-l border-[#E5E5E5] dark:border-[#303030]' : ''
                 } ${
                   workspace[key]
-                    ? 'bg-[#F5F7FA] dark:bg-[#252525] text-[#4184F3] font-medium'
-                    : 'text-[#888888] hover:bg-[#FAFAFA] dark:hover:bg-[#1E1E1E]'
+                    ? 'bg-[#FFF5F2] dark:bg-[#2C1D18] text-[#FF5722] font-medium'
+                    : 'text-[#888888] hover:text-[#FF5722] hover:bg-[#FAFAFA] dark:hover:bg-[#1E1E1E]'
                 }`}
               >
                 {label}
@@ -517,7 +517,7 @@ export function TerminalView({
                             <button
                               type="button"
                               onClick={() => onSelectToken(pos.token)}
-                              className="hover:text-[#4184F3] cursor-pointer"
+                              className="hover:text-[#FF5722] active:text-[#FF5722] cursor-pointer"
                             >
                               {pos.symbol}
                             </button>
@@ -577,10 +577,10 @@ export function TerminalView({
                 <button
                   type="button"
                   onClick={() => setBlotterTab('orders')}
-                  className={`py-0.5 text-[12.5px] cursor-pointer ${
+                  className={`py-0.5 text-[12.5px] cursor-pointer transition-colors ${
                     blotterTab === 'orders'
                       ? 'text-[#FF5722] font-medium'
-                      : 'text-[#666666] dark:text-[#A0A0A0] hover:text-[#444444]'
+                      : 'text-[#666666] dark:text-[#A0A0A0] hover:text-[#FF5722]'
                   }`}
                 >
                   Orders ({portfolio.orders.length})
@@ -588,10 +588,10 @@ export function TerminalView({
                 <button
                   type="button"
                   onClick={() => setBlotterTab('holdings')}
-                  className={`py-0.5 text-[12.5px] cursor-pointer ${
+                  className={`py-0.5 text-[12.5px] cursor-pointer transition-colors ${
                     blotterTab === 'holdings'
                       ? 'text-[#FF5722] font-medium'
-                      : 'text-[#666666] dark:text-[#A0A0A0] hover:text-[#444444]'
+                      : 'text-[#666666] dark:text-[#A0A0A0] hover:text-[#FF5722]'
                   }`}
                 >
                   Holdings ({portfolio.holdings.length})

@@ -39,23 +39,64 @@ export function calculateRequiredMargin(
 }
 
 export function computeHoldingMetrics(holding: Holding, quote?: MarketQuote) {
-  const ltp = quote ? quote.ltp : holding.averagePrice;
-  const prevClose = quote ? quote.close : holding.averagePrice;
+  const ltp = round2(quote ? quote.ltp : holding.averagePrice);
+  const prevClose = round2(quote ? quote.close : holding.averagePrice);
+  const investedValue = round2(holding.investedValue);
   const currentValue = round2(holding.quantity * ltp);
-  const pnl = round2(currentValue - holding.investedValue);
+  const prevValue = round2(holding.quantity * prevClose);
+  const pnl = round2(currentValue - investedValue);
   const pnlPercent =
-    holding.investedValue > 0 ? round2((pnl / holding.investedValue) * 100) : 0;
-  const dayPnl = round2((ltp - prevClose) * holding.quantity);
+    investedValue > 0 ? round2((pnl / investedValue) * 100) : 0;
+  const dayPnl = round2(currentValue - prevValue);
   const dayChangePercent =
     prevClose > 0 ? round2(((ltp - prevClose) / prevClose) * 100) : 0;
 
   return {
     ltp,
+    prevClose,
+    prevValue,
     currentValue,
     pnl,
     pnlPercent,
     dayPnl,
     dayChangePercent,
+  };
+}
+
+export function computeHoldingsTotals(
+  rows: ReadonlyArray<{
+    investedValue: number;
+    currentValue: number;
+    dayPnl: number;
+    prevValue?: number;
+  }>,
+) {
+  let investment = 0;
+  let current = 0;
+  let dayPnl = 0;
+  let prevTotal = 0;
+  for (const r of rows) {
+    investment += r.investedValue;
+    current += r.currentValue;
+    dayPnl += r.dayPnl;
+    prevTotal += r.prevValue !== undefined ? r.prevValue : r.currentValue - r.dayPnl;
+  }
+  investment = round2(investment);
+  current = round2(current);
+  dayPnl = round2(dayPnl);
+  prevTotal = round2(prevTotal);
+
+  const totalPnl = round2(current - investment);
+  const totalPnlPct = investment > 0 ? round2((totalPnl / investment) * 100) : 0;
+  const dayPnlPct = prevTotal > 0 ? round2((dayPnl / prevTotal) * 100) : 0;
+
+  return {
+    investment,
+    current,
+    totalPnl,
+    totalPnlPct,
+    dayPnl,
+    dayPnlPct,
   };
 }
 

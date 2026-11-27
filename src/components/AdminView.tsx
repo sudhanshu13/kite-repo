@@ -352,7 +352,7 @@ export function AdminView({
           <button
             type="button"
             onClick={() => onNavigate('funds')}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium border border-[#E0E0E0] dark:border-[#333333] text-[#444444] dark:text-[#E0E0E0] hover:border-[#4184F3] hover:text-[#4184F3] rounded transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium border border-[#E0E0E0] dark:border-[#333333] text-[#444444] dark:text-[#E0E0E0] hover:border-[#FF5722] hover:text-[#FF5722] active:text-[#FF5722] rounded transition-colors cursor-pointer"
           >
             <Wallet className="w-3.5 h-3.5" />
             <span>Funds &amp; API Settings</span>
@@ -422,7 +422,7 @@ export function AdminView({
         <button
           type="button"
           onClick={loadUsers}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#666666] dark:text-[#A0A0A0] hover:text-[#4184F3] cursor-pointer self-start sm:self-auto"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#666666] dark:text-[#A0A0A0] hover:text-[#FF5722] active:text-[#FF5722] cursor-pointer self-start sm:self-auto"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           <span>Refresh directory</span>

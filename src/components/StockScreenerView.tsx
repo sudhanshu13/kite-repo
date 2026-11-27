@@ -313,8 +313,8 @@ export function StockScreenerView({
               aria-expanded={filtersOpen}
               className={`inline-flex items-center gap-1.5 h-[32px] px-3 text-[12px] rounded-[3px] border transition-colors cursor-pointer ${
                 filtersOpen || activeFilterCount > 0
-                  ? 'border-[#4184F3] text-[#4184F3] bg-[#4184F3]/5'
-                  : 'border-[#CCCCCC] dark:border-[#3A3A3A] text-[#444444] dark:text-[#E0E0E0] bg-white dark:bg-[#181818] hover:border-[#999999]'
+                  ? 'border-[#FF5722] text-[#FF5722] bg-[#FF5722]/5'
+                  : 'border-[#CCCCCC] dark:border-[#3A3A3A] text-[#444444] dark:text-[#E0E0E0] bg-white dark:bg-[#181818] hover:border-[#FF5722] hover:text-[#FF5722]'
               }`}
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -372,8 +372,8 @@ export function StockScreenerView({
                         }}
                         className={`py-1 text-[11px] rounded border cursor-pointer ${
                           changeFilter === opt.id
-                            ? 'border-[#4184F3] bg-[#4184F3]/10 text-[#4184F3] font-medium'
-                            : 'border-[#E0E0E0] dark:border-[#333333] text-[#666666] dark:text-[#A0A0A0]'
+                            ? 'border-[#FF5722] bg-[#FF5722]/10 text-[#FF5722] font-medium'
+                            : 'border-[#E0E0E0] dark:border-[#333333] text-[#666666] dark:text-[#A0A0A0] hover:text-[#FF5722]'
                         }`}
                       >
                         {opt.label}
@@ -413,7 +413,7 @@ export function StockScreenerView({
             onClick={handleReset}
             aria-label="Reset screener filters"
             title="Reset filters"
-            className="p-1.5 text-[#666666] dark:text-[#A0A0A0] hover:text-[#4184F3] transition-colors cursor-pointer"
+            className="p-1.5 text-[#666666] dark:text-[#A0A0A0] hover:text-[#FF5722] active:text-[#FF5722] transition-colors cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
@@ -442,7 +442,7 @@ export function StockScreenerView({
               type="button"
               onClick={() => setColumnsOpen((prev) => !prev)}
               aria-expanded={columnsOpen}
-              className="inline-flex items-center gap-1.5 text-[12px] text-[#4184F3] hover:text-[#3367D6] cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-[12px] text-[#4184F3] hover:text-[#FF5722] active:text-[#FF5722] transition-colors cursor-pointer"
             >
               <ListFilter className="w-3.5 h-3.5" />
               <span>Columns</span>
@@ -468,7 +468,7 @@ export function StockScreenerView({
                       onChange={(e) =>
                         setColumns((prev) => ({ ...prev, [col.key]: e.target.checked }))
                       }
-                      className="accent-[#4184F3]"
+                      className="accent-[#FF5722]"
                     />
                     <span>{col.label}</span>
                   </label>
@@ -481,7 +481,7 @@ export function StockScreenerView({
           <button
             type="button"
             onClick={handleDownloadCsv}
-            className="inline-flex items-center gap-1.5 text-[12px] text-[#4184F3] hover:text-[#3367D6] cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-[12px] text-[#4184F3] hover:text-[#FF5722] active:text-[#FF5722] transition-colors cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Download</span>
@@ -582,7 +582,7 @@ export function StockScreenerView({
                         <button
                           type="button"
                           onClick={() => onSelectSymbolForTechnicals(row.token!)}
-                          className="font-normal text-[#444444] dark:text-[#E0E0E0] hover:text-[#4184F3] cursor-pointer text-left"
+                          className="font-normal text-[#444444] dark:text-[#E0E0E0] hover:text-[#FF5722] active:text-[#FF5722] cursor-pointer text-left"
                         >
                           {row.symbol}
                         </button>

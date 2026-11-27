@@ -1,6 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Briefcase, Check, CircleDot, Copy, Droplet, PieChart, X } from 'lucide-react';
-import { computeHoldingMetrics, computePositionMetrics } from '../../shared/portfolioMath.ts';
+import {
+  computeHoldingMetrics,
+  computeHoldingsTotals,
+  computePositionMetrics,
+} from '../../shared/portfolioMath.ts';
 import type {
   Instrument,
   MarketQuote,
@@ -55,26 +59,21 @@ export function DashboardView({
   const [copiedCode, setCopiedCode] = useState(false);
 
   const holdingsSummary = useMemo(() => {
-    let totalInvestment = 0;
-    let currentValue = 0;
-    let dayPnl = 0;
     const rows = portfolio.holdings.map((h, idx) => {
       const m = computeHoldingMetrics(h, quotes[h.token]);
-      totalInvestment += h.investedValue;
-      currentValue += m.currentValue;
-      dayPnl += m.dayPnl;
       return {
         token: h.token,
         symbol: h.symbol,
         investedValue: h.investedValue,
         currentValue: m.currentValue,
+        dayPnl: m.dayPnl,
+        prevValue: m.prevValue,
         color: ALLOCATION_COLORS[idx % ALLOCATION_COLORS.length],
       };
     });
-    const totalPnl = currentValue - totalInvestment;
-    const totalPnlPct = totalInvestment > 0 ? (totalPnl / totalInvestment) * 100 : 0;
+    const totals = computeHoldingsTotals(rows);
 
-    const totalBase = allocationMode === 'current' ? currentValue : totalInvestment;
+    const totalBase = allocationMode === 'current' ? totals.current : totals.investment;
     const allocation = rows
       .map((row) => {
         const value = allocationMode === 'current' ? row.currentValue : row.investedValue;
@@ -83,7 +82,14 @@ export function DashboardView({
       })
       .sort((a, b) => b.value - a.value);
 
-    return { totalInvestment, currentValue, totalPnl, totalPnlPct, dayPnl, allocation };
+    return {
+      totalInvestment: totals.investment,
+      currentValue: totals.current,
+      totalPnl: totals.totalPnl,
+      totalPnlPct: totals.totalPnlPct,
+      dayPnl: totals.dayPnl,
+      allocation,
+    };
   }, [portfolio.holdings, quotes, allocationMode]);
 
   const openPositions = useMemo(
@@ -201,7 +207,7 @@ export function DashboardView({
                       <button
                         type="button"
                         onClick={() => onNavigate('funds')}
-                        className="inline-flex items-center gap-1.5 text-[12px] text-[#4184F3] hover:underline cursor-pointer"
+                        className="inline-flex items-center gap-1.5 text-[12px] text-[#4184F3] hover:text-[#FF5722] active:text-[#FF5722] hover:underline cursor-pointer"
                       >
                         <CircleDot className="w-3 h-3" />
                         <span>View statement</span>
@@ -239,7 +245,7 @@ export function DashboardView({
                       <button
                         type="button"
                         onClick={() => onNavigate('funds')}
-                        className="inline-flex items-center gap-1.5 text-[12px] text-[#4184F3] hover:underline cursor-pointer"
+                        className="inline-flex items-center gap-1.5 text-[12px] text-[#4184F3] hover:text-[#FF5722] active:text-[#FF5722] hover:underline cursor-pointer"
                       >
                         <CircleDot className="w-3 h-3" />
                         <span>View statement</span>
@@ -280,7 +286,7 @@ export function DashboardView({
                       <button
                         type="button"
                         onClick={() => onNavigate('holdings')}
-                        className="text-[12px] text-[#4184F3] hover:underline cursor-pointer"
+                        className="text-[12px] text-[#4184F3] hover:text-[#FF5722] active:text-[#FF5722] hover:underline transition-colors cursor-pointer"
                       >
                         View all
                       </button>
@@ -347,10 +353,10 @@ export function DashboardView({
                             <button
                               type="button"
                               onClick={() => setAllocationMode('current')}
-                              className={`px-2 py-0.5 text-[11px] cursor-pointer ${
+                              className={`px-2 py-0.5 text-[11px] cursor-pointer transition-colors ${
                                 allocationMode === 'current'
-                                  ? 'bg-[#4184F3]/10 text-[#4184F3] font-medium'
-                                  : 'text-[#666666] dark:text-[#A0A0A0]'
+                                  ? 'bg-[#FF5722]/10 text-[#FF5722] font-medium'
+                                  : 'text-[#666666] dark:text-[#A0A0A0] hover:text-[#FF5722]'
                               }`}
                             >
                               Current value
@@ -358,10 +364,10 @@ export function DashboardView({
                             <button
                               type="button"
                               onClick={() => setAllocationMode('investment')}
-                              className={`px-2 py-0.5 text-[11px] border-l border-[#E5E5E5] dark:border-[#303030] cursor-pointer ${
+                              className={`px-2 py-0.5 text-[11px] border-l border-[#E5E5E5] dark:border-[#303030] cursor-pointer transition-colors ${
                                 allocationMode === 'investment'
-                                  ? 'bg-[#4184F3]/10 text-[#4184F3] font-medium'
-                                  : 'text-[#666666] dark:text-[#A0A0A0]'
+                                  ? 'bg-[#FF5722]/10 text-[#FF5722] font-medium'
+                                  : 'text-[#666666] dark:text-[#A0A0A0] hover:text-[#FF5722]'
                               }`}
                             >
                               Investment value
@@ -391,7 +397,7 @@ export function DashboardView({
                               key={item.token}
                               type="button"
                               onClick={() => onSelectSymbolForTechnicals(item.token)}
-                              className="inline-flex items-center gap-1.5 text-[#666666] dark:text-[#A0A0A0] hover:text-[#4184F3] cursor-pointer"
+                              className="inline-flex items-center gap-1.5 text-[#666666] dark:text-[#A0A0A0] hover:text-[#FF5722] active:text-[#FF5722] transition-colors cursor-pointer"
                             >
                               <span
                                 className="w-2 h-2 rounded-full shrink-0"
@@ -417,7 +423,7 @@ export function DashboardView({
                           <button
                             type="button"
                             onClick={() => onNavigate('positions')}
-                            className="text-[12px] text-[#4184F3] hover:underline cursor-pointer"
+                            className="text-[12px] text-[#4184F3] hover:text-[#FF5722] active:text-[#FF5722] hover:underline transition-colors cursor-pointer"
                           >
                             Manage positions
                           </button>
@@ -447,7 +453,7 @@ export function DashboardView({
                                     <button
                                       type="button"
                                       onClick={() => onSelectSymbolForTechnicals(position.token)}
-                                      className="text-[#444444] dark:text-[#E0E0E0] hover:text-[#4184F3] cursor-pointer"
+                                      className="text-[#444444] dark:text-[#E0E0E0] hover:text-[#FF5722] active:text-[#FF5722] transition-colors cursor-pointer"
                                     >
                                       {position.symbol}
                                     </button>

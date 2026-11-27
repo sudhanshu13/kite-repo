@@ -145,3 +145,54 @@ test('parseYahooSearchQuotes parses NSE and BSE equities and ignores non-Indian 
   assert.ok(parsed[1].name.includes('(BSE)'));
   assert.notEqual(parsed[0].token, parsed[1].token);
 });
+
+test('parseYahooChartResponse preserves 1-paisa precision for low-priced stocks and avoids stale 5d chartPreviousClose', () => {
+  const pennyInst: Instrument = {
+    token: 71234567,
+    symbol: 'ANTGRAPHIC',
+    name: 'Antarctica Limited',
+    exchange: 'NSE',
+    lotSize: 1,
+    tickSize: 0.05,
+    basePrice: 0.73,
+    sector: 'Equity',
+    yahooSymbol: 'ANTGRAPHIC.NS',
+  };
+
+  const payload = {
+    chart: {
+      result: [
+        {
+          meta: {
+            regularMarketPrice: 0.73,
+            chartPreviousClose: 0.65, // 5 days ago
+            regularMarketTime: 1794909667,
+            currentTradingPeriod: {
+              regular: { start: 1794887100, end: 1794909600 },
+            },
+          },
+          timestamp: [1794700000, 1794820000, 1794887100, 1794887400],
+          indicators: {
+            quote: [
+              {
+                open: [0.68, 0.71, 0.72, 0.73],
+                high: [0.7, 0.73, 0.74, 0.74],
+                low: [0.67, 0.7, 0.72, 0.72],
+                close: [0.69, 0.72, 0.73, 0.73],
+                volume: [1000, 2000, 3000, 4000],
+              },
+            ],
+          },
+        },
+      ],
+    },
+  };
+
+  const parsed = parseYahooChartResponse(payload, pennyInst, 1794910000 * 1000);
+  assert.ok(parsed);
+  assert.equal(parsed.ltp, 0.73);
+  assert.equal(parsed.prevClose, 0.72);
+  assert.equal(parsed.change, 0.01);
+  assert.equal(parsed.changePercent, 1.39);
+});
+

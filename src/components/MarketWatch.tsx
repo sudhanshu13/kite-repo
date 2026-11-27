@@ -3,13 +3,14 @@ import {
   Activity,
   BarChart2,
   Briefcase,
+  Check,
   ChevronDown,
-  ChevronRight,
   ChevronUp,
   FolderInput,
   Layers,
   Loader2,
   Plus,
+  PlusCircle,
   Search,
   SlidersVertical,
   Trash2,
@@ -28,6 +29,82 @@ import type {
 } from '../../shared/types.ts';
 import { apiFetch } from '../utils/api.ts';
 import { formatPrice, getChangeColorClass, getSignalTextClass } from '../utils/format.ts';
+
+function KiteGroupChevronIcon({ collapsed, className = 'w-[15px] h-[15px]' }: { collapsed: boolean; className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" className={className} aria-hidden="true">
+      {collapsed ? (
+        <path
+          d="M4.25 6.25L8 10L11.75 6.25"
+          stroke="currentColor"
+          strokeWidth="1.45"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      ) : (
+        <path
+          d="M4.25 9.75L8 6L11.75 9.75"
+          stroke="currentColor"
+          strokeWidth="1.45"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
+    </svg>
+  );
+}
+
+function KiteGroupMaximizeIcon({ maximized, className = 'w-[15px] h-[15px]' }: { maximized: boolean; className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" className={className} aria-hidden="true">
+      {maximized ? (
+        <>
+          <path d="M5.75 3V4.85C5.75 5.35 5.35 5.75 4.85 5.75H3" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M13 5.75H11.15C10.65 5.75 10.25 5.35 10.25 4.85V3" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M10.25 13V11.15C10.25 10.65 10.65 10.25 11.15 10.25H13" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M3 10.25H4.85C5.35 10.25 5.75 10.65 5.75 11.15V13" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" />
+        </>
+      ) : (
+        <>
+          <path d="M3 5.75V3.9C3 3.4 3.4 3 3.9 3H5.75" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M10.25 3H12.1C12.6 3 13 3.4 13 3.9V5.75" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M13 10.25V12.1C13 12.6 12.6 13 12.1 13H10.25" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M5.75 13H3.9C3.4 13 3 12.6 3 12.1V10.25" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function KiteGroupEditIcon({ className = 'w-[15px] h-[15px]' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M10.35 2.85a1.2 1.2 0 0 1 1.7 0l.85.85a1.2 1.2 0 0 1 0 1.7L6.7 11.6l-2.65.45.45-2.65 5.85-6.55Z"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M3.5 14H12.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function KiteGroupMoreIcon({ className = 'w-[15px] h-[15px]' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" className={className} aria-hidden="true">
+      <circle cx="8" cy="3.75" r="1.15" />
+      <circle cx="8" cy="8" r="1.15" />
+      <circle cx="8" cy="12.25" r="1.15" />
+    </svg>
+  );
+}
 
 interface MarketWatchProps {
   instruments: Instrument[];
@@ -157,6 +234,10 @@ export function MarketWatch({
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [editingGroupName, setEditingGroupName] = useState('');
+  const [maximizedGroupId, setMaximizedGroupId] = useState<string | null>(null);
+  const [openGroupMenuId, setOpenGroupMenuId] = useState<string | null>(null);
   const [targetGroupIdForAdd, setTargetGroupIdForAdd] = useState<string | null>(null);
   const [movingToken, setMovingToken] = useState<number | null>(null);
 
@@ -200,6 +281,8 @@ export function MarketWatch({
         setSearchFocused(false);
         setSettingsOpen(false);
         setMovingToken(null);
+        setOpenGroupMenuId(null);
+        setEditingGroupId(null);
       }
     }
     window.addEventListener('keydown', handleKeyDown);
@@ -235,6 +318,10 @@ export function MarketWatch({
       }
       if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
         setSettingsOpen(false);
+      }
+      const target = e.target as HTMLElement | null;
+      if (target && !target.closest('[data-mw-group-menu]')) {
+        setOpenGroupMenuId(null);
       }
     }
     document.addEventListener('mousedown', handleOutside);
@@ -385,6 +472,40 @@ export function MarketWatch({
     }
     persistCurrentGroups(remaining);
     if (targetGroupIdForAdd === groupId) setTargetGroupIdForAdd(null);
+    if (maximizedGroupId === groupId) setMaximizedGroupId(null);
+    if (openGroupMenuId === groupId) setOpenGroupMenuId(null);
+  }
+
+  function handleStartEditGroup(group: WatchlistGroup) {
+    setEditingGroupId(group.id);
+    setEditingGroupName(group.name);
+    setOpenGroupMenuId(null);
+  }
+
+  function handleSaveGroupRename(e: FormEvent, groupId: string) {
+    e.preventDefault();
+    const trimmed = editingGroupName.trim();
+    if (!trimmed) {
+      setEditingGroupId(null);
+      return;
+    }
+    const nextGroups = groups.map((g) =>
+      g.id === groupId ? { ...g, name: trimmed } : { ...g },
+    );
+    persistCurrentGroups(nextGroups);
+    setEditingGroupId(null);
+    setEditingGroupName('');
+  }
+
+  function handleToggleMaximizeGroup(groupId: string) {
+    setMaximizedGroupId((prev) => {
+      const next = prev === groupId ? null : groupId;
+      if (next) {
+        setCollapsedGroups((c) => ({ ...c, [groupId]: false }));
+      }
+      return next;
+    });
+    setOpenGroupMenuId(null);
   }
 
   function handleMoveTokenToGroup(token: number, destGroupId: string) {
@@ -438,8 +559,9 @@ export function MarketWatch({
 
   return (
     <aside
+      data-testid="marketwatch-rail"
       aria-label="Marketwatch"
-      className="w-full lg:w-[375px] xl:w-[400px] min-[1760px]:w-[432px] shrink-0 bg-[#FFFFFF] dark:bg-[#141414] border-b lg:border-b-0 lg:border-r border-[#EEEEEE] dark:border-[#282828] flex flex-col lg:h-full"
+      className="w-full lg:w-[383px] xl:w-[432px] shrink-0 bg-[#FFFFFF] dark:bg-[#141414] border-b lg:border-b-0 lg:border-r border-[#EEEEEE] dark:border-[#282828] flex flex-col lg:h-full"
     >
       {/* Top Bordered Search Box (Exact Kite Style with Ctrl+K & Filter Sliders) */}
       <div ref={searchContainerRef} className="relative px-3.5 pt-3 pb-1.5">
@@ -517,8 +639,8 @@ export function MarketWatch({
                         onClick={() => setSortMode(opt.id)}
                         className={`px-2 py-1 text-[11px] rounded border transition-colors cursor-pointer ${
                           sortMode === opt.id
-                            ? 'border-[#4184F3] bg-[#4184F3]/10 text-[#4184F3] font-medium'
-                            : 'border-[#E5E5E5] dark:border-[#333333] text-[#666666] dark:text-[#A0A0A0] hover:border-[#CCCCCC]'
+                            ? 'border-[#FF5722] bg-[#FF5722]/10 text-[#FF5722] font-medium'
+                            : 'border-[#E5E5E5] dark:border-[#333333] text-[#666666] dark:text-[#A0A0A0] hover:border-[#FF5722] hover:text-[#FF5722]'
                         }`}
                       >
                         {opt.label}
@@ -535,7 +657,7 @@ export function MarketWatch({
                     type="checkbox"
                     checked={showTechnicalsTag}
                     onChange={(e) => setShowTechnicalsTag(e.target.checked)}
-                    className="accent-[#4184F3]"
+                    className="accent-[#FF5722]"
                   />
                 </label>
               </div>
@@ -571,7 +693,7 @@ export function MarketWatch({
                     className={`px-2 py-0.5 rounded-[2px] transition-colors cursor-pointer ${
                       active
                         ? 'bg-[#FF5722]/12 text-[#FF5722] font-medium'
-                        : 'text-[#666666] dark:text-[#A0A0A0] hover:text-[#222222] dark:hover:text-[#E0E0E0]'
+                        : 'text-[#666666] dark:text-[#A0A0A0] hover:text-[#FF5722] dark:hover:text-[#FF5722]'
                     }`}
                   >
                     {cat.label}
@@ -695,14 +817,14 @@ export function MarketWatch({
       </div>
 
       {/* Watchlist Count & "+ New group" Bar */}
-      <div className="px-3.5 py-1.5 flex items-center justify-between text-[12px]">
+      <div className="px-3.5 py-1.5 flex items-center justify-between text-[11.5px] font-normal">
         <span className="text-[#888888] dark:text-[#9A9A9A] tabular-nums">
           {activeWatchlistId} ({activeTokens.length} / 250)
         </span>
         <button
           type="button"
           onClick={() => setCreatingGroup((prev) => !prev)}
-          className="text-[#4184F3] hover:text-[#3367D6] font-medium cursor-pointer"
+          className="text-[#4184F3] hover:text-[#FF5722] active:text-[#FF5722] font-normal transition-colors cursor-pointer"
         >
           + New group
         </button>
@@ -747,68 +869,206 @@ export function MarketWatch({
 
       {/* Grouped Watchlist Boxes */}
       <div className="flex-1 overflow-y-auto px-3.5 pb-3 space-y-2.5">
-        {groups.map((group) => {
-          const isCollapsed = !!collapsedGroups[group.id];
+        {(maximizedGroupId && groups.some((g) => g.id === maximizedGroupId)
+          ? groups.filter((g) => g.id === maximizedGroupId)
+          : groups
+        ).map((group) => {
+          const isCollapsed = maximizedGroupId === group.id ? false : !!collapsedGroups[group.id];
+          const isMaximized = maximizedGroupId === group.id;
+          const isEditing = editingGroupId === group.id;
+          const isMenuOpen = openGroupMenuId === group.id;
+
           return (
             <section
               key={group.id}
               aria-label={`${group.name} group`}
-              className="border border-[#EAEAEA] dark:border-[#2A2A2A] rounded-[3px] bg-white dark:bg-[#181818] overflow-hidden"
+              className={`border border-[#EAEAEA] dark:border-[#2A2A2A] rounded-[3px] bg-white dark:bg-[#181818] ${
+                isMaximized ? 'min-h-full flex flex-col' : ''
+              }`}
             >
-              {/* Neutral Kite Group Header */}
-              <div className="group/hdr flex items-center justify-between px-3 py-2 bg-[#F7F7F7] dark:bg-[#1D1D1D] border-b border-[#EFEFEF] dark:border-[#2B2B2B]">
-                <button
-                  type="button"
-                  onClick={() => toggleGroupCollapse(group.id)}
-                  aria-expanded={!isCollapsed}
-                  className="flex items-center gap-1.5 text-left min-w-0 cursor-pointer"
-                >
-                  <span className="text-[12px] font-semibold text-[#444444] dark:text-[#E8E8E8] truncate">
-                    {group.name}
-                  </span>
-                  <span className="text-[11.5px] font-normal text-[#9B9B9B] dark:text-[#9A9A9A] tabular-nums">
-                    ({group.tokens.length})
-                  </span>
-                </button>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTargetGroupIdForAdd(group.id);
-                      searchInputRef.current?.focus();
-                      setSearchFocused(true);
-                    }}
-                    title={`Add symbol to ${group.name}`}
-                    aria-label={`Add symbol to ${group.name}`}
-                    className="opacity-0 group-hover/hdr:opacity-100 focus:opacity-100 p-0.5 text-[#888888] hover:text-[#4184F3] transition-opacity cursor-pointer"
+              {/* Neutral Kite Group Header with Collapse, Add Group, Edit Group, Maximize & Three-Dots Menu */}
+              <div className="group/hdr relative flex items-center justify-between gap-2 px-3 py-2 bg-[#F7F7F7] dark:bg-[#1D1D1D] border-b border-[#EFEFEF] dark:border-[#2B2B2B] rounded-t-[3px]">
+                {isEditing ? (
+                  <form
+                    onSubmit={(e) => handleSaveGroupRename(e, group.id)}
+                    className="flex items-center gap-1 flex-1 min-w-0"
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                  {groups.length > 1 && (
+                    <input
+                      type="text"
+                      value={editingGroupName}
+                      onChange={(e) => setEditingGroupName(e.target.value)}
+                      aria-label={`Rename ${group.name} group`}
+                      maxLength={28}
+                      autoFocus
+                      className="flex-1 min-w-0 px-1.5 py-0.5 text-[12px] bg-white dark:bg-[#141414] border border-[#FF5722] rounded-[2px] text-[#444444] dark:text-[#E8E8E8] focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      aria-label="Save group name"
+                      title="Save"
+                      className="p-0.5 text-[#4CAF50] hover:text-[#FF5722] cursor-pointer"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
                     <button
                       type="button"
-                      onClick={() => handleDeleteGroup(group.id)}
-                      title={`Delete ${group.name} group`}
-                      aria-label={`Delete ${group.name} group`}
-                      className="opacity-0 group-hover/hdr:opacity-100 focus:opacity-100 p-0.5 text-[#888888] hover:text-[#DF514C] transition-opacity cursor-pointer"
+                      onClick={() => {
+                        setEditingGroupId(null);
+                        setEditingGroupName('');
+                      }}
+                      aria-label="Cancel rename"
+                      title="Cancel"
+                      className="p-0.5 text-[#888888] hover:text-[#FF5722] cursor-pointer"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <X className="w-3.5 h-3.5" />
                     </button>
-                  )}
+                  </form>
+                ) : (
                   <button
                     type="button"
                     onClick={() => toggleGroupCollapse(group.id)}
-                    aria-label={isCollapsed ? `Expand ${group.name}` : `Collapse ${group.name}`}
-                    className="p-0.5 text-[#9B9B9B] hover:text-[#444444] dark:hover:text-[#E0E0E0] cursor-pointer"
+                    aria-expanded={!isCollapsed}
+                    className="flex items-center gap-1.5 text-left min-w-0 cursor-pointer"
                   >
-                    {isCollapsed ? (
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    ) : (
-                      <ChevronDown className="w-3.5 h-3.5" />
-                    )}
+                    <span className="text-[12px] font-medium text-[#444444] dark:text-[#E8E8E8] truncate">
+                      {group.name}
+                    </span>
+                    <span className="text-[12px] font-normal text-[#9B9B9B] dark:text-[#9A9A9A] tabular-nums shrink-0">
+                      ({group.tokens.length})
+                    </span>
                   </button>
-                </div>
+                )}
+
+                {!isEditing && (
+                  <div
+                    data-testid="mw-group-actions"
+                    className="flex items-center gap-3 shrink-0"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleGroupCollapse(group.id)}
+                      title={isCollapsed ? `Expand ${group.name}` : `Collapse ${group.name}`}
+                      aria-label={isCollapsed ? `Expand ${group.name}` : `Collapse ${group.name}`}
+                      className="p-0.5 text-[#7A7A7A] dark:text-[#9A9A9A] hover:text-[#FF5722] transition-colors cursor-pointer"
+                    >
+                      <KiteGroupChevronIcon collapsed={isCollapsed} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleMaximizeGroup(group.id)}
+                      title={isMaximized ? `Restore all groups` : `Maximize ${group.name} group`}
+                      aria-label={isMaximized ? `Restore all groups` : `Maximize ${group.name} group`}
+                      className={`p-0.5 transition-colors cursor-pointer ${
+                        isMaximized
+                          ? 'text-[#FF5722]'
+                          : 'text-[#7A7A7A] dark:text-[#9A9A9A] hover:text-[#FF5722]'
+                      }`}
+                    >
+                      <KiteGroupMaximizeIcon maximized={isMaximized} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleStartEditGroup(group)}
+                      title={`Edit ${group.name} group`}
+                      aria-label={`Edit ${group.name} group`}
+                      className="p-0.5 text-[#7A7A7A] dark:text-[#9A9A9A] hover:text-[#FF5722] transition-colors cursor-pointer"
+                    >
+                      <KiteGroupEditIcon />
+                    </button>
+
+                    <div data-mw-group-menu className="relative">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenGroupMenuId((prev) => (prev === group.id ? null : group.id))
+                        }
+                        title={`More options for ${group.name}`}
+                        aria-label={`More options for ${group.name}`}
+                        aria-haspopup="menu"
+                        aria-expanded={isMenuOpen}
+                        className={`p-0.5 transition-colors cursor-pointer ${
+                          isMenuOpen
+                            ? 'text-[#FF5722]'
+                            : 'text-[#7A7A7A] dark:text-[#9A9A9A] hover:text-[#FF5722]'
+                        }`}
+                      >
+                        <KiteGroupMoreIcon />
+                      </button>
+
+                      {isMenuOpen && (
+                        <div
+                          role="menu"
+                          aria-label={`${group.name} group menu`}
+                          className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#333333] rounded-[4px] shadow-lg py-1 z-40 text-[12px]"
+                        >
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setTargetGroupIdForAdd(group.id);
+                              setOpenGroupMenuId(null);
+                              searchInputRef.current?.focus();
+                              setSearchFocused(true);
+                            }}
+                            className="w-full px-3 py-1.5 text-left flex items-center gap-2 text-[#444444] dark:text-[#D4D4D4] hover:bg-[#F5F7FA] dark:hover:bg-[#262626] hover:text-[#FF5722] cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5 shrink-0" />
+                            <span>Add symbol</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setCreatingGroup(true);
+                              setOpenGroupMenuId(null);
+                            }}
+                            className="w-full px-3 py-1.5 text-left flex items-center gap-2 text-[#444444] dark:text-[#D4D4D4] hover:bg-[#F5F7FA] dark:hover:bg-[#262626] hover:text-[#FF5722] cursor-pointer"
+                          >
+                            <PlusCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>Add new group</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => handleStartEditGroup(group)}
+                            className="w-full px-3 py-1.5 text-left flex items-center gap-2 text-[#444444] dark:text-[#D4D4D4] hover:bg-[#F5F7FA] dark:hover:bg-[#262626] hover:text-[#FF5722] cursor-pointer"
+                          >
+                            <KiteGroupEditIcon className="w-3.5 h-3.5 shrink-0" />
+                            <span>Edit group</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => handleToggleMaximizeGroup(group.id)}
+                            className="w-full px-3 py-1.5 text-left flex items-center gap-2 text-[#444444] dark:text-[#D4D4D4] hover:bg-[#F5F7FA] dark:hover:bg-[#262626] hover:text-[#FF5722] cursor-pointer"
+                          >
+                            <KiteGroupMaximizeIcon maximized={isMaximized} className="w-3.5 h-3.5 shrink-0" />
+                            <span>{isMaximized ? 'Restore groups' : 'Maximize group'}</span>
+                          </button>
+
+                          {groups.length > 1 && (
+                            <div className="my-1 border-t border-[#EEEEEE] dark:border-[#2C2C2C] pt-1">
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => handleDeleteGroup(group.id)}
+                                className="w-full px-3 py-1.5 text-left flex items-center gap-2 text-[#DF514C] dark:text-[#F87171] hover:bg-[#FEF2F2] dark:hover:bg-[#2C1A1A] cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                                <span>Delete group</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Instrument Rows inside Box */}
@@ -865,16 +1125,20 @@ export function MarketWatch({
                               : 'hover:bg-[#FAFAFA] dark:hover:bg-[#1E1E1E]'
                           }`}
                         >
-                          <div className="relative px-3.5 py-[11px] flex items-center justify-between gap-2">
+                          <div
+                            data-testid="mw-row"
+                            className="relative px-3.5 py-[11px] flex items-center justify-between gap-2 overflow-hidden"
+                          >
                             {/* Left: Symbol (+ Exchange badge only for non-NSE) */}
                             <button
                               type="button"
+                              data-testid="mw-row-symbol"
                               onClick={() => onSelectSymbolForTechnicals(token)}
-                              className="text-left min-w-0 flex-1 cursor-pointer"
+                              className="text-left min-w-0 flex-1 overflow-hidden cursor-pointer"
                             >
                               <div className="flex items-baseline gap-1.5 min-w-0">
                                 <span
-                                  className={`text-[12.5px] font-normal truncate ${
+                                  className={`block text-[12.5px] font-normal truncate ${
                                     q.change < 0
                                       ? 'text-[#DF514C] dark:text-[#F87171]'
                                       : q.change > 0
@@ -885,13 +1149,13 @@ export function MarketWatch({
                                   {inst.symbol}
                                 </span>
                                 {exchangeLabel && (
-                                  <span className="text-[9.5px] text-[#9B9B9B] uppercase tracking-wide shrink-0">
+                                  <span className="text-[9.5px] font-normal text-[#9B9B9B] uppercase tracking-wide shrink-0">
                                     {exchangeLabel}
                                   </span>
                                 )}
                               </div>
                               {showTechnicalsTag && (
-                                <div className="text-[10.5px] mt-0.5 flex items-center gap-1 text-[#9B9B9B]">
+                                <div className="text-[10.5px] mt-0.5 flex items-center gap-1 text-[#9B9B9B] truncate">
                                   <span>{inst.sector}</span>
                                   <span>·</span>
                                   <span className={`font-medium ${getSignalTextClass(signal)}`}>
@@ -902,23 +1166,26 @@ export function MarketWatch({
                             </button>
 
                             {/* Right: Kite Holding Qty + Briefcase + Change + % + Chevron + LTP */}
-                            <div className="flex items-center gap-2.5 shrink-0 tabular-nums group-hover:opacity-0 transition-opacity">
+                            <div
+                              data-testid="mw-row-price"
+                              className="flex items-center gap-2 xl:gap-2.5 shrink-0 tabular-nums group-hover:opacity-0 transition-opacity"
+                            >
                               {holdingQty > 0 && (
                                 <span
                                   title={`Holding: ${holdingQty} qty`}
-                                  className="inline-flex items-center gap-1 text-[11px] text-[#9B9B9B] dark:text-[#8C8C8C]"
+                                  className="inline-flex items-center gap-1 text-[11px] font-normal text-[#9B9B9B] dark:text-[#8C8C8C]"
                                 >
                                   <span>{holdingQty}</span>
                                   <Briefcase className="w-3 h-3 stroke-[1.6] text-[#A8A8A8]" />
                                 </span>
                               )}
-                              <span className="text-[11.5px] text-[#9B9B9B] dark:text-[#8C8C8C] hidden sm:inline">
+                              <span className="text-[11.5px] font-normal text-[#9B9B9B] dark:text-[#8C8C8C] hidden sm:inline">
                                 {absChangeText}
                               </span>
-                              <span className="text-[11.5px] text-[#444444] dark:text-[#CFCFCF]">
+                              <span className="text-[11.5px] font-normal text-[#444444] dark:text-[#CFCFCF]">
                                 {pctText}
                               </span>
-                              <span className={`flex items-center gap-1 text-[12.5px] font-normal min-w-[66px] justify-end ${changeColor}`}>
+                              <span className={`flex items-center gap-1 text-[12.5px] font-normal min-w-[64px] justify-end ${changeColor}`}>
                                 {q.change >= 0 ? (
                                   <ChevronUp className="w-3 h-3 stroke-[1.75] shrink-0" />
                                 ) : (
@@ -985,7 +1252,7 @@ export function MarketWatch({
                                   }
                                   aria-label={`Move ${inst.symbol} to another group`}
                                   title="Move to group"
-                                  className="w-7 h-6 rounded border border-[#E0E0E0] dark:border-[#333333] bg-white dark:bg-[#181818] text-[#666666] dark:text-[#A0A0A0] hover:border-[#4184F3] hover:text-[#4184F3] flex items-center justify-center cursor-pointer"
+                                  className="w-7 h-6 rounded border border-[#E0E0E0] dark:border-[#333333] bg-white dark:bg-[#181818] text-[#666666] dark:text-[#A0A0A0] hover:border-[#FF5722] hover:text-[#FF5722] flex items-center justify-center cursor-pointer"
                                 >
                                   <FolderInput className="w-3.5 h-3.5" />
                                 </button>
@@ -1120,11 +1387,14 @@ export function MarketWatch({
                   onSelectWatchlist(id);
                   setTargetGroupIdForAdd(null);
                   setCreatingGroup(false);
+                  setMaximizedGroupId(null);
+                  setEditingGroupId(null);
+                  setOpenGroupMenuId(null);
                 }}
                 className={`w-[38px] sm:w-[40px] h-9 text-[12px] tabular-nums transition-colors cursor-pointer relative ${
                   active
                     ? 'text-[#FF5722] font-medium bg-[#FAFAFA] dark:bg-[#1E1E1E]'
-                    : 'text-[#666666] dark:text-[#8C8C8C] hover:text-[#444444] dark:hover:text-[#E0E0E0] font-normal'
+                    : 'text-[#666666] dark:text-[#8C8C8C] hover:text-[#FF5722] dark:hover:text-[#FF5722] font-normal'
                 }`}
               >
                 {id}
@@ -1141,7 +1411,7 @@ export function MarketWatch({
           onClick={() => setCreatingGroup((prev) => !prev)}
           aria-label="Manage watchlist groups"
           title="New watchlist group"
-          className="h-9 px-3 flex items-center justify-center text-[#8C8C8C] hover:text-[#444444] dark:hover:text-[#E0E0E0] transition-colors cursor-pointer"
+          className="h-9 px-3 flex items-center justify-center text-[#8C8C8C] hover:text-[#FF5722] dark:hover:text-[#FF5722] transition-colors cursor-pointer"
         >
           <Layers className="w-3.5 h-3.5" />
         </button>

@@ -4,6 +4,7 @@ import {
   applyFilledOrderToPortfolio,
   calculateRequiredMargin,
   computeHoldingMetrics,
+  computeHoldingsTotals,
   computePositionMetrics,
   validateOrderRequest,
 } from './portfolioMath.ts';
@@ -279,4 +280,65 @@ test('CNC buys at different prices (1 @ 2395 + 100 @ 1500) average in holdings a
   assert.equal(afterAllSold.holdings.length, 0);
   assert.equal(afterAllSold.usedMargin, 0);
 });
+
+test('computeHoldingMetrics and computeHoldingsTotals match exact Kite portfolio math for penny + large-cap mix', () => {
+  const antHolding = {
+    token: 71001,
+    symbol: 'ANTGRAPHIC',
+    exchange: 'NSE' as const,
+    quantity: 84901,
+    averagePrice: 1.65,
+    investedValue: 140086.65,
+    t1Quantity: 0,
+  };
+  const tvsHolding = {
+    token: 71002,
+    symbol: 'TVSMOTOR',
+    exchange: 'NSE' as const,
+    quantity: 1,
+    averagePrice: 1105,
+    investedValue: 1105,
+    t1Quantity: 0,
+  };
+
+  const antMetrics = computeHoldingMetrics(antHolding, {
+    ...sampleQuote,
+    token: 71001,
+    symbol: 'ANTGRAPHIC',
+    ltp: 0.73,
+    close: 0.72,
+  });
+  const tvsMetrics = computeHoldingMetrics(tvsHolding, {
+    ...sampleQuote,
+    token: 71002,
+    symbol: 'TVSMOTOR',
+    ltp: 4597.75,
+    close: 4529.0,
+  });
+
+  assert.equal(antMetrics.currentValue, 61977.73);
+  assert.equal(antMetrics.pnl, -78108.92);
+  assert.equal(antMetrics.pnlPercent, -55.76);
+  assert.equal(antMetrics.dayPnl, 849.01);
+  assert.equal(antMetrics.dayChangePercent, 1.39);
+
+  assert.equal(tvsMetrics.currentValue, 4597.75);
+  assert.equal(tvsMetrics.pnl, 3492.75);
+  assert.equal(tvsMetrics.pnlPercent, 316.09);
+  assert.equal(tvsMetrics.dayPnl, 68.75);
+  assert.equal(tvsMetrics.dayChangePercent, 1.52);
+
+  const totals = computeHoldingsTotals([
+    { investedValue: antHolding.investedValue, ...antMetrics },
+    { investedValue: tvsHolding.investedValue, ...tvsMetrics },
+  ]);
+
+  assert.equal(totals.investment, 141191.65);
+  assert.equal(totals.current, 66575.48);
+  assert.equal(totals.totalPnl, -74616.17);
+  assert.equal(totals.totalPnlPct, -52.85);
+  assert.equal(totals.dayPnl, 917.76);
+  assert.equal(totals.dayPnlPct, 1.4);
+});
+
 

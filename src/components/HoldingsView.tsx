@@ -13,7 +13,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { computeHoldingMetrics } from '../../shared/portfolioMath.ts';
+import { computeHoldingMetrics, computeHoldingsTotals } from '../../shared/portfolioMath.ts';
 import type { Holding, MarketQuote, OrderSide } from '../../shared/types.ts';
 import { formatPrice, getChangeColorClass } from '../utils/format.ts';
 
@@ -82,6 +82,7 @@ interface UnifiedHoldingRow {
   averagePrice: number;
   investedValue: number;
   ltp: number;
+  prevValue: number;
   currentValue: number;
   pnl: number;
   pnlPercent: number;
@@ -202,6 +203,7 @@ export function HoldingsView({
           averagePrice: h.averagePrice,
           investedValue: h.investedValue,
           ltp: metrics.ltp,
+          prevValue: metrics.prevValue,
           currentValue: metrics.currentValue,
           pnl: metrics.pnl,
           pnlPercent: metrics.pnlPercent,
@@ -215,12 +217,14 @@ export function HoldingsView({
   const mutualFundRows = useMemo<UnifiedHoldingRow[]>(
     () =>
       mutualFunds.map((mf) => {
-        const investedValue = mf.units * mf.avgNav;
-        const currentValue = mf.units * mf.ltpNav;
-        const pnl = currentValue - investedValue;
-        const pnlPercent = investedValue > 0 ? (pnl / investedValue) * 100 : 0;
+        const investedValue = Math.round(mf.units * mf.avgNav * 100) / 100;
+        const currentValue = Math.round(mf.units * mf.ltpNav * 100) / 100;
+        const pnl = Math.round((currentValue - investedValue) * 100) / 100;
+        const pnlPercent =
+          investedValue > 0 ? Math.round((pnl / investedValue) * 10000) / 100 : 0;
         const prevNav = mf.ltpNav / (1 + mf.dayChangePct / 100);
-        const dayPnl = (mf.ltpNav - prevNav) * mf.units;
+        const prevValue = Math.round(mf.units * prevNav * 100) / 100;
+        const dayPnl = Math.round((currentValue - prevValue) * 100) / 100;
         return {
           key: mf.id,
           type: 'mutual_funds',
@@ -230,6 +234,7 @@ export function HoldingsView({
           averagePrice: mf.avgNav,
           investedValue,
           ltp: mf.ltpNav,
+          prevValue,
           currentValue,
           pnl,
           pnlPercent,
@@ -262,20 +267,7 @@ export function HoldingsView({
     });
   }, [tabRows, subFilter, searchQuery]);
 
-  const totals = useMemo(() => {
-    let investment = 0;
-    let current = 0;
-    let dayPnl = 0;
-    for (const r of filteredRows) {
-      investment += r.investedValue;
-      current += r.currentValue;
-      dayPnl += r.dayPnl;
-    }
-    const totalPnl = current - investment;
-    const totalPnlPct = investment > 0 ? (totalPnl / investment) * 100 : 0;
-    const dayPnlPct = current > 0 ? (dayPnl / (current - dayPnl || current)) * 100 : 0;
-    return { investment, current, totalPnl, totalPnlPct, dayPnl, dayPnlPct };
-  }, [filteredRows]);
+  const totals = useMemo(() => computeHoldingsTotals(filteredRows), [filteredRows]);
 
   const barSegments = useMemo(() => {
     const raw = filteredRows.map((row, idx) => {
@@ -534,7 +526,7 @@ export function HoldingsView({
             <button
               type="button"
               onClick={() => onNotify?.('Family portfolio linking is available in paper admin mode.')}
-              className="inline-flex items-center gap-1.5 text-[#4184F3] hover:text-[#3367D6] cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-[#4184F3] hover:text-[#FF5722] active:text-[#FF5722] transition-colors cursor-pointer"
             >
               <Users className="w-3.5 h-3.5" />
               <span>Family</span>
@@ -543,7 +535,7 @@ export function HoldingsView({
             <button
               type="button"
               onClick={() => setAnalyticsOpen(true)}
-              className="inline-flex items-center gap-1.5 text-[#4184F3] hover:text-[#3367D6] cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-[#4184F3] hover:text-[#FF5722] active:text-[#FF5722] transition-colors cursor-pointer"
             >
               <CircleDot className="w-3.5 h-3.5" />
               <span>Analytics</span>
@@ -552,7 +544,7 @@ export function HoldingsView({
             <button
               type="button"
               onClick={handleDownloadCsv}
-              className="inline-flex items-center gap-1.5 text-[#4184F3] hover:text-[#3367D6] cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-[#4184F3] hover:text-[#FF5722] active:text-[#FF5722] transition-colors cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Download</span>
@@ -664,6 +656,7 @@ export function HoldingsView({
                     <th className="py-3 px-2.5 lg:px-3 font-normal text-right whitespace-nowrap">
                       Day chg.
                     </th>
+                    <th className="py-3 px-1 w-8 font-normal text-right" aria-label="Row actions" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F2F2F2] dark:divide-[#242424]">
@@ -675,72 +668,32 @@ export function HoldingsView({
                         className="group hover:bg-[#FAFAFA] dark:hover:bg-[#1D1D1D] transition-colors"
                       >
                         <td className="py-3.5 px-2.5 lg:px-3 border-r border-[#F2F2F2] dark:border-[#262626]">
-                          <div className="flex items-center justify-between gap-1.5">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              {row.type === 'equity' && row.token !== undefined ? (
-                                <button
-                                  type="button"
-                                  onClick={() => onSelectSymbolForTechnicals(row.token!)}
-                                  className="font-normal text-[13px] text-[#444444] dark:text-[#E0E0E0] hover:text-[#4184F3] cursor-pointer text-left truncate"
-                                >
-                                  {row.symbol}
-                                </button>
-                              ) : (
-                                <span className="font-normal text-[13px] text-[#444444] dark:text-[#E0E0E0] truncate">
-                                  {row.symbol}
-                                </span>
-                              )}
-                              {row.type === 'mutual_funds' && activeTab === 'all' && (
-                                <span className="text-[9.5px] px-1 py-0.2 bg-[#F1F5F9] dark:bg-[#262626] text-[#4184F3] rounded">
-                                  MF
-                                </span>
-                              )}
-                              {subFilter === 'T1 holdings' &&
-                              row.t1Quantity &&
-                              row.t1Quantity > 0 ? (
-                                <span className="text-[9.5px] px-1 py-0.2 bg-[#EFF6FF] dark:bg-[#1D2B3D] text-[#4184F3] rounded shrink-0">
-                                  T1:{row.t1Quantity}
-                                </span>
-                              ) : null}
-                            </div>
-
-                            {/* Three-Dot Action Button (appears on hover/focus or when menu open, zero table width inflation) */}
-                            <div
-                              data-holding-menu
-                              className={`shrink-0 ${
-                                isMenuOpen
-                                  ? 'opacity-100'
-                                  : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
-                              } transition-opacity`}
-                            >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {row.type === 'equity' && row.token !== undefined ? (
                               <button
                                 type="button"
-                                aria-label={`Actions for ${row.symbol}`}
-                                aria-haspopup="menu"
-                                aria-expanded={isMenuOpen}
-                                onClick={(e) => {
-                                  if (isMenuOpen) {
-                                    setOpenMenu(null);
-                                    return;
-                                  }
-                                  const rect = e.currentTarget.getBoundingClientRect();
-                                  const openUpward = window.innerHeight - rect.bottom < 220;
-                                  setOpenMenu({
-                                    key: row.key,
-                                    top: openUpward ? rect.top - 4 : rect.bottom + 4,
-                                    right: Math.max(8, window.innerWidth - rect.right),
-                                    openUpward,
-                                  });
-                                }}
-                                className={`w-6 h-6 rounded-[3px] flex items-center justify-center transition-colors cursor-pointer ${
-                                  isMenuOpen
-                                    ? 'bg-[#EBEBEB] dark:bg-[#2E2E2E] text-[#222222] dark:text-white'
-                                    : 'hover:bg-[#EFEFEF] dark:hover:bg-[#2A2A2A] text-[#666666] dark:text-[#A0A0A0]'
-                                }`}
+                                onClick={() => onSelectSymbolForTechnicals(row.token!)}
+                                className="font-normal text-[13px] text-[#444444] dark:text-[#E0E0E0] hover:text-[#FF5722] active:text-[#FF5722] cursor-pointer text-left truncate transition-colors"
                               >
-                                <MoreVertical className="w-3.5 h-3.5" />
+                                {row.symbol}
                               </button>
-                            </div>
+                            ) : (
+                              <span className="font-normal text-[13px] text-[#444444] dark:text-[#E0E0E0] truncate">
+                                {row.symbol}
+                              </span>
+                            )}
+                            {row.type === 'mutual_funds' && activeTab === 'all' && (
+                              <span className="text-[9.5px] px-1 py-0.2 bg-[#F1F5F9] dark:bg-[#262626] text-[#4184F3] rounded">
+                                MF
+                              </span>
+                            )}
+                            {subFilter === 'T1 holdings' &&
+                            row.t1Quantity &&
+                            row.t1Quantity > 0 ? (
+                              <span className="text-[9.5px] px-1 py-0.2 bg-[#EFF6FF] dark:bg-[#1D2B3D] text-[#4184F3] rounded shrink-0">
+                                T1:{row.t1Quantity}
+                              </span>
+                            ) : null}
                           </div>
                           {row.subtitle && (
                             <div className="text-[11px] text-[#9B9B9B] mt-0.5">{row.subtitle}</div>
@@ -786,6 +739,46 @@ export function HoldingsView({
                             {row.dayChangePercent.toFixed(2)}%
                           </span>
                         </td>
+
+                        {/* Three-Dot Action Menu moved to the last column */}
+                        <td className="py-3.5 px-1 text-right w-8">
+                          <div
+                            data-holding-menu
+                            className={`inline-flex justify-end ${
+                              isMenuOpen
+                                ? 'opacity-100'
+                                : 'opacity-45 group-hover:opacity-100 group-focus-within:opacity-100'
+                            } transition-opacity`}
+                          >
+                            <button
+                              type="button"
+                              aria-label={`Actions for ${row.symbol}`}
+                              aria-haspopup="menu"
+                              aria-expanded={isMenuOpen}
+                              onClick={(e) => {
+                                if (isMenuOpen) {
+                                  setOpenMenu(null);
+                                  return;
+                                }
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const openUpward = window.innerHeight - rect.bottom < 220;
+                                setOpenMenu({
+                                  key: row.key,
+                                  top: openUpward ? rect.top - 4 : rect.bottom + 4,
+                                  right: Math.max(8, window.innerWidth - rect.right),
+                                  openUpward,
+                                });
+                              }}
+                              className={`w-6 h-6 rounded-[3px] flex items-center justify-center transition-colors cursor-pointer ${
+                                isMenuOpen
+                                  ? 'bg-[#EBEBEB] dark:bg-[#2E2E2E] text-[#FF5722]'
+                                  : 'hover:bg-[#EFEFEF] dark:hover:bg-[#2A2A2A] text-[#666666] dark:text-[#A0A0A0]'
+                              }`}
+                            >
+                              <MoreVertical className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}
@@ -815,24 +808,23 @@ export function HoldingsView({
                       {totals.totalPnlPct >= 0 ? '+' : ''}
                       {totals.totalPnlPct.toFixed(2)}%
                     </td>
-                    <td className="py-3.5 px-2.5 lg:px-3 text-right text-[11.5px] whitespace-nowrap">
-                      <span className="text-[#444444] dark:text-[#E0E0E0]">
-                        {formatIndianSigned(totals.dayPnl)}
-                      </span>{' '}
-                      <span className={getChangeColorClass(totals.dayPnlPct)}>
-                        ({totals.dayPnlPct.toFixed(2)}%)
-                      </span>
+                    <td
+                      className={`py-3.5 px-2.5 lg:px-3 text-right text-[11.5px] whitespace-nowrap ${getChangeColorClass(totals.dayPnl)}`}
+                    >
+                      <span>{formatIndianSigned(totals.dayPnl)}</span>{' '}
+                      <span>({totals.dayPnlPct.toFixed(2)}%)</span>
                     </td>
+                    <td className="py-3.5 px-1 w-8" />
                   </tr>
                 </tfoot>
               </table>
             </div>
 
-            {/* Bottom Full-Width Stacked Allocation Bar + Radio Toggle */}
-            <div className="pt-3 space-y-3">
+            {/* Bottom Full-Width Stacked Allocation Bar + Radio Toggle (Kite 72px height) */}
+            <div className="pt-4 space-y-3">
               <div
                 aria-label="Holdings allocation breakdown bar"
-                className="h-[54px] w-full flex overflow-hidden rounded-[1px] bg-[#F3F4F6] dark:bg-[#222222]"
+                className="h-[72px] w-full flex overflow-hidden rounded-[1px] bg-[#F3F4F6] dark:bg-[#222222]"
               >
                 {barSegments.map((seg) => (
                   <div
@@ -877,13 +869,13 @@ export function HoldingsView({
                         name="holdings-bar-mode"
                         checked={barMode === opt.id}
                         onChange={() => setBarMode(opt.id)}
-                        className="accent-[#4184F3] cursor-pointer"
+                        className="accent-[#FF5722] cursor-pointer"
                       />
                       <span
                         className={
                           barMode === opt.id
-                            ? 'text-[#444444] dark:text-[#E0E0E0]'
-                            : ''
+                            ? 'text-[#FF5722] font-medium'
+                            : 'hover:text-[#FF5722]'
                         }
                       >
                         {opt.label}

@@ -283,7 +283,7 @@ export function PositionsView({
                       <button
                         type="button"
                         onClick={() => onSelectSymbolForTechnicals(pos.token)}
-                        className="font-normal text-[#444444] dark:text-[#E0E0E0] hover:text-[#4184F3] cursor-pointer text-left"
+                        className="font-normal text-[#444444] dark:text-[#E0E0E0] hover:text-[#FF5722] active:text-[#FF5722] cursor-pointer text-left"
                       >
                         {pos.symbol}
                       </button>

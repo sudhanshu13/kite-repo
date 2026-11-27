@@ -76,8 +76,30 @@ export function parseYahooChartResponse(
     return null;
   }
 
-  const tickSize = instrument.tickSize || 0.05;
-  const ltp = roundTick(meta.regularMarketPrice, tickSize);
+  const timestamps = result.timestamp ?? [];
+  const q = result.indicators?.quote?.[0] ?? {};
+  const opens = q.open ?? [];
+  const highs = q.high ?? [];
+  const lows = q.low ?? [];
+  const closes = q.close ?? [];
+  const volumes = q.volume ?? [];
+
+  const ltp = round2(meta.regularMarketPrice);
+  const regStart = meta.currentTradingPeriod?.regular?.start;
+
+  // Find the most recent valid close prior to today's regular session start (for multi-day 5d charts)
+  let priorSessionClose: number | undefined;
+  if (typeof regStart === 'number') {
+    for (let i = timestamps.length - 1; i >= 0; i--) {
+      if (timestamps[i] < regStart) {
+        const c = closes[i];
+        if (typeof c === 'number' && Number.isFinite(c) && c > 0) {
+          priorSessionClose = c;
+          break;
+        }
+      }
+    }
+  }
 
   let rawPrevClose: number | undefined;
   if (
@@ -88,36 +110,35 @@ export function parseYahooChartResponse(
     rawPrevClose = meta.regularMarketPrice - meta.fulldayChange;
   } else if (typeof meta.previousClose === 'number' && meta.previousClose > 0) {
     rawPrevClose = meta.previousClose;
+  } else if (
+    typeof meta.regularMarketChangePercent === 'number' &&
+    Number.isFinite(meta.regularMarketChangePercent) &&
+    1 + meta.regularMarketChangePercent / 100 > 0
+  ) {
+    rawPrevClose = meta.regularMarketPrice / (1 + meta.regularMarketChangePercent / 100);
+  } else if (typeof priorSessionClose === 'number' && priorSessionClose > 0) {
+    rawPrevClose = priorSessionClose;
   } else if (typeof meta.chartPreviousClose === 'number' && meta.chartPreviousClose > 0) {
     rawPrevClose = meta.chartPreviousClose;
   } else {
     rawPrevClose = ltp;
   }
 
-  const prevClose = roundTick(rawPrevClose, tickSize);
+  const prevClose = round2(rawPrevClose);
   const change = round2(ltp - prevClose);
   const changePercent = prevClose > 0 ? round2((change / prevClose) * 100) : 0;
-
-  const timestamps = result.timestamp ?? [];
-  const q = result.indicators?.quote?.[0] ?? {};
-  const opens = q.open ?? [];
-  const highs = q.high ?? [];
-  const lows = q.low ?? [];
-  const closes = q.close ?? [];
-  const volumes = q.volume ?? [];
 
   const historyCloses: number[] = [];
   for (let i = 0; i < closes.length; i++) {
     const c = closes[i];
     if (typeof c === 'number' && Number.isFinite(c) && c > 0) {
-      historyCloses.push(roundTick(c, tickSize));
+      historyCloses.push(round2(c));
     }
   }
   if (historyCloses.length > 0 && historyCloses[historyCloses.length - 1] !== ltp) {
     historyCloses.push(ltp);
   }
 
-  const regStart = meta.currentTradingPeriod?.regular?.start;
   const regEnd = meta.currentTradingPeriod?.regular?.end;
   const nowSec = Math.floor(nowMs / 1000);
   const isMarketOpen =
@@ -142,7 +163,7 @@ export function parseYahooChartResponse(
     const v = volumes[i];
 
     if (todayOpen === undefined && typeof o === 'number' && Number.isFinite(o) && o > 0) {
-      todayOpen = roundTick(o, tickSize);
+      todayOpen = round2(o);
     }
     if (typeof h === 'number' && Number.isFinite(h) && h > 0) {
       todayHigh = Math.max(todayHigh, h);
@@ -164,17 +185,15 @@ export function parseYahooChartResponse(
     }
   }
 
-  const high = roundTick(
+  const high = round2(
     typeof meta.regularMarketDayHigh === 'number' && meta.regularMarketDayHigh > 0
       ? Math.max(meta.regularMarketDayHigh, ltp)
       : todayHigh,
-    tickSize,
   );
-  const low = roundTick(
+  const low = round2(
     typeof meta.regularMarketDayLow === 'number' && meta.regularMarketDayLow > 0
       ? Math.min(meta.regularMarketDayLow, ltp)
       : todayLow,
-    tickSize,
   );
   const open = todayOpen ?? prevClose;
   const volume = instrument.isIndex
@@ -182,20 +201,18 @@ export function parseYahooChartResponse(
     : Math.max(0, Math.round(meta.regularMarketVolume ?? vSum ?? 0));
   const averagePrice =
     vSum > 0
-      ? roundTick(pvSum / vSum, tickSize)
-      : roundTick((high + low + ltp) / 3, tickSize);
+      ? round2(pvSum / vSum)
+      : round2((high + low + ltp) / 3);
 
-  const week52High = roundTick(
+  const week52High = round2(
     typeof meta.fiftyTwoWeekHigh === 'number' && meta.fiftyTwoWeekHigh > 0
       ? Math.max(meta.fiftyTwoWeekHigh, high)
       : Math.max(high, ltp * 1.15),
-    tickSize,
   );
-  const week52Low = roundTick(
+  const week52Low = round2(
     typeof meta.fiftyTwoWeekLow === 'number' && meta.fiftyTwoWeekLow > 0
       ? Math.min(meta.fiftyTwoWeekLow, low)
       : Math.min(low, ltp * 0.8),
-    tickSize,
   );
 
   return {
