@@ -273,7 +273,7 @@ export function TopBar({
     >
       <header
         data-testid="kite-header"
-        className="h-[50px] w-full max-w-[1280px] min-[1560px]:max-w-[1380px] min-[1760px]:max-w-[1536px] mx-auto flex items-center justify-between"
+        className="h-[50px] w-full max-w-[1360px] min-[1560px]:max-w-[1440px] min-[1760px]:max-w-[1560px] mx-auto flex items-center justify-between"
       >
         {/* Left Zone: Indices aligned over MarketWatch rail */}
         <div

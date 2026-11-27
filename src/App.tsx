@@ -940,13 +940,13 @@ export default function App() {
       />
 
       {!portfolio ? (
-        <div className="flex-1 w-full max-w-[1280px] min-[1560px]:max-w-[1380px] min-[1760px]:max-w-[1536px] mx-auto flex items-center justify-center bg-[#FFFFFF] dark:bg-[#121212] xl:border-x xl:border-[#EEEEEE] dark:xl:border-[#242424] text-xs text-[#9B9B9B]">
+        <div className="flex-1 w-full max-w-[1360px] min-[1560px]:max-w-[1440px] min-[1760px]:max-w-[1560px] mx-auto flex items-center justify-center bg-[#FFFFFF] dark:bg-[#121212] xl:border-x xl:border-[#EEEEEE] dark:xl:border-[#242424] text-xs text-[#9B9B9B]">
           Loading portfolio and live market stream...
         </div>
       ) : (
         <div
           data-testid="kite-shell"
-          className="flex-1 flex flex-col lg:flex-row min-h-0 lg:overflow-hidden w-full max-w-[1280px] min-[1560px]:max-w-[1380px] min-[1760px]:max-w-[1536px] mx-auto bg-[#FFFFFF] dark:bg-[#121212] xl:border-x xl:border-[#EEEEEE] dark:xl:border-[#242424] xl:shadow-[0_0_2px_rgba(0,0,0,0.03)]"
+          className="flex-1 flex flex-col lg:flex-row min-h-0 lg:overflow-hidden w-full max-w-[1360px] min-[1560px]:max-w-[1440px] min-[1760px]:max-w-[1560px] mx-auto bg-[#FFFFFF] dark:bg-[#121212] xl:border-x xl:border-[#EEEEEE] dark:xl:border-[#242424] xl:shadow-[0_0_2px_rgba(0,0,0,0.03)]"
         >
           <div className={`lg:h-full shrink-0 ${mobilePane === 'watchlist' ? 'block lg:block' : 'hidden lg:block'}`}>
             <MarketWatch

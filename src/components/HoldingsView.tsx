@@ -443,7 +443,7 @@ export function HoldingsView({
   return (
     <div className="w-full">
       {/* Top Sub-Tab Bar: All | Equity | Mutual funds */}
-      <div className="px-5 lg:px-8 border-b border-[#EEEEEE] dark:border-[#282828]">
+      <div className="px-5 lg:px-6 xl:px-7 border-b border-[#EEEEEE] dark:border-[#282828]">
         <div
           role="tablist"
           aria-label="Holdings categories"
@@ -478,7 +478,7 @@ export function HoldingsView({
       </div>
 
       {/* Main Holdings Content */}
-      <div className="px-5 py-5 lg:px-8 lg:py-6 space-y-5">
+      <div className="px-5 py-5 lg:px-6 xl:px-7 lg:py-6 space-y-5">
         {/* Toolbar Row: Holdings (N) + Filter Select | Search + Family + Analytics + Download */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3.5">
@@ -624,39 +624,40 @@ export function HoldingsView({
           <>
             <div
               ref={tableContainerRef}
-              className="overflow-x-auto overflow-y-hidden border-t border-[#EEEEEE] dark:border-[#282828]"
+              data-testid="holdings-table-wrapper"
+              className="overflow-x-auto lg:overflow-x-visible overflow-y-hidden border-t border-[#EEEEEE] dark:border-[#282828]"
             >
               <table className="w-full text-[13px] text-left border-collapse">
                 <thead>
                   <tr className="border-b border-[#EEEEEE] dark:border-[#282828] text-[12px] text-[#9B9B9B] dark:text-[#8C8C8C]">
-                    <th className="py-3 px-2.5 lg:px-3 font-normal border-r border-[#F2F2F2] dark:border-[#262626] min-w-[130px]">
+                    <th className="py-3 px-2 xl:px-2.5 font-normal border-r border-[#F2F2F2] dark:border-[#262626] min-w-[112px]">
                       Instrument
                     </th>
-                    <th className="py-3 px-2.5 lg:px-3 font-normal text-right whitespace-nowrap">
+                    <th className="py-3 px-2 xl:px-2.5 font-normal text-right whitespace-nowrap">
                       {activeTab === 'mutual_funds' ? 'Units' : 'Qty.'}
                     </th>
-                    <th className="py-3 px-2.5 lg:px-3 font-normal text-right whitespace-nowrap">
+                    <th className="py-3 px-2 xl:px-2.5 font-normal text-right whitespace-nowrap">
                       {activeTab === 'mutual_funds' ? 'Avg. NAV' : 'Avg. cost'}
                     </th>
-                    <th className="py-3 px-2.5 lg:px-3 font-normal text-right border-r border-[#F2F2F2] dark:border-[#262626] whitespace-nowrap">
+                    <th className="py-3 px-2 xl:px-2.5 font-normal text-right border-r border-[#F2F2F2] dark:border-[#262626] whitespace-nowrap">
                       {activeTab === 'mutual_funds' ? 'NAV' : 'LTP'}
                     </th>
-                    <th className="py-3 px-2.5 lg:px-3 font-normal text-right whitespace-nowrap">
+                    <th className="py-3 px-2 xl:px-2.5 font-normal text-right whitespace-nowrap">
                       Invested
                     </th>
-                    <th className="py-3 px-2.5 lg:px-3 font-normal text-right whitespace-nowrap">
+                    <th className="py-3 px-2 xl:px-2.5 font-normal text-right whitespace-nowrap">
                       Cur. val
                     </th>
-                    <th className="py-3 px-2.5 lg:px-3 font-normal text-right bg-[#FAFAFA] dark:bg-[#191919] whitespace-nowrap">
+                    <th className="py-3 px-2 xl:px-2.5 font-normal text-right bg-[#FAFAFA] dark:bg-[#191919] whitespace-nowrap">
                       P&amp;L
                     </th>
-                    <th className="py-3 px-2.5 lg:px-3 font-normal text-right whitespace-nowrap">
+                    <th className="py-3 px-2 xl:px-2.5 font-normal text-right whitespace-nowrap">
                       Net chg.
                     </th>
-                    <th className="py-3 px-2.5 lg:px-3 font-normal text-right whitespace-nowrap">
+                    <th className="py-3 px-2 xl:px-2.5 font-normal text-right whitespace-nowrap">
                       Day chg.
                     </th>
-                    <th className="py-3 px-1 w-8 font-normal text-right" aria-label="Row actions" />
+                    <th className="py-3 px-0.5 w-7 font-normal text-right" aria-label="Row actions" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F2F2F2] dark:divide-[#242424]">
@@ -665,9 +666,10 @@ export function HoldingsView({
                     return (
                       <tr
                         key={row.key}
+                        data-testid="holding-row"
                         className="group hover:bg-[#FAFAFA] dark:hover:bg-[#1D1D1D] transition-colors"
                       >
-                        <td className="py-3.5 px-2.5 lg:px-3 border-r border-[#F2F2F2] dark:border-[#262626]">
+                        <td className="py-3.5 px-2 xl:px-2.5 border-r border-[#F2F2F2] dark:border-[#262626]">
                           <div className="flex items-center gap-1.5 min-w-0">
                             {row.type === 'equity' && row.token !== undefined ? (
                               <button
@@ -700,55 +702,55 @@ export function HoldingsView({
                           )}
                         </td>
 
-                        <td className="py-3.5 px-2.5 lg:px-3 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0] whitespace-nowrap">
+                        <td className="py-3.5 px-2 xl:px-2.5 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0] whitespace-nowrap">
                           {row.type === 'mutual_funds' ? row.quantity.toFixed(2) : row.quantity}
                         </td>
 
-                        <td className="py-3.5 px-2.5 lg:px-3 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0] whitespace-nowrap">
+                        <td className="py-3.5 px-2 xl:px-2.5 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0] whitespace-nowrap">
                           {formatPrice(row.averagePrice)}
                         </td>
 
-                        <td className="py-3.5 px-2.5 lg:px-3 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0] border-r border-[#F2F2F2] dark:border-[#262626] whitespace-nowrap">
+                        <td className="py-3.5 px-2 xl:px-2.5 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0] border-r border-[#F2F2F2] dark:border-[#262626] whitespace-nowrap">
                           {formatPrice(row.ltp)}
                         </td>
 
-                        <td className="py-3.5 px-2.5 lg:px-3 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0] whitespace-nowrap">
+                        <td className="py-3.5 px-2 xl:px-2.5 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0] whitespace-nowrap">
                           {formatPrice(row.investedValue)}
                         </td>
 
-                        <td className="py-3.5 px-2.5 lg:px-3 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0] whitespace-nowrap">
+                        <td className="py-3.5 px-2 xl:px-2.5 text-right tabular-nums text-[#444444] dark:text-[#E0E0E0] whitespace-nowrap">
                           {formatPrice(row.currentValue)}
                         </td>
 
                         <td
-                          className={`py-3.5 px-2.5 lg:px-3 text-right tabular-nums bg-[#FAFAFA] dark:bg-[#191919] whitespace-nowrap ${getChangeColorClass(row.pnl)}`}
+                          className={`py-3.5 px-2 xl:px-2.5 text-right tabular-nums bg-[#FAFAFA] dark:bg-[#191919] whitespace-nowrap ${getChangeColorClass(row.pnl)}`}
                         >
                           {formatIndianSigned(row.pnl)}
                         </td>
 
                         <td
-                          className={`py-3.5 px-2.5 lg:px-3 text-right tabular-nums text-[11.5px] whitespace-nowrap ${getChangeColorClass(row.pnlPercent)}`}
+                          className={`py-3.5 px-2 xl:px-2.5 text-right tabular-nums text-[11.5px] whitespace-nowrap ${getChangeColorClass(row.pnlPercent)}`}
                         >
                           {row.pnlPercent >= 0 ? '+' : ''}
                           {row.pnlPercent.toFixed(2)}%
                         </td>
 
-                        <td className="py-3.5 px-2.5 lg:px-3 text-right tabular-nums text-[11.5px] whitespace-nowrap">
+                        <td className="py-3.5 px-2 xl:px-2.5 text-right tabular-nums text-[11.5px] whitespace-nowrap">
                           <span className={getChangeColorClass(row.dayChangePercent)}>
                             {row.dayChangePercent >= 0 ? '+' : ''}
                             {row.dayChangePercent.toFixed(2)}%
                           </span>
                         </td>
 
-                        {/* Three-Dot Action Menu moved to the last column */}
-                        <td className="py-3.5 px-1 text-right w-8">
+                        {/* Three-Dot Action Menu shown only on row hover (or while open) */}
+                        <td className="py-3.5 px-0.5 text-right w-7">
                           <div
                             data-holding-menu
-                            className={`inline-flex justify-end ${
+                            className={`inline-flex justify-end transition-opacity ${
                               isMenuOpen
-                                ? 'opacity-100'
-                                : 'opacity-45 group-hover:opacity-100 group-focus-within:opacity-100'
-                            } transition-opacity`}
+                                ? 'opacity-100 pointer-events-auto'
+                                : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto'
+                            }`}
                           >
                             <button
                               type="button"
@@ -787,34 +789,34 @@ export function HoldingsView({
                 {/* Bold Summary Total Footer Row */}
                 <tfoot>
                   <tr className="border-t border-[#EEEEEE] dark:border-[#282828] font-medium text-[13px] tabular-nums">
-                    <td colSpan={3} className="py-3.5 px-2.5 lg:px-3" />
-                    <td className="py-3.5 px-2.5 lg:px-3 text-right text-[#444444] dark:text-[#E0E0E0]">
+                    <td colSpan={3} className="py-3.5 px-2 xl:px-2.5" />
+                    <td className="py-3.5 px-2 xl:px-2.5 text-right text-[#444444] dark:text-[#E0E0E0]">
                       Total
                     </td>
-                    <td className="py-3.5 px-2.5 lg:px-3 text-right text-[#444444] dark:text-[#E0E0E0] whitespace-nowrap">
+                    <td className="py-3.5 px-2 xl:px-2.5 text-right text-[#444444] dark:text-[#E0E0E0] whitespace-nowrap">
                       {formatPrice(totals.investment)}
                     </td>
-                    <td className="py-3.5 px-2.5 lg:px-3 text-right text-[#444444] dark:text-[#E0E0E0] whitespace-nowrap">
+                    <td className="py-3.5 px-2 xl:px-2.5 text-right text-[#444444] dark:text-[#E0E0E0] whitespace-nowrap">
                       {formatPrice(totals.current)}
                     </td>
                     <td
-                      className={`py-3.5 px-2.5 lg:px-3 text-right bg-[#FAFAFA] dark:bg-[#191919] whitespace-nowrap ${getChangeColorClass(totals.totalPnl)}`}
+                      className={`py-3.5 px-2 xl:px-2.5 text-right bg-[#FAFAFA] dark:bg-[#191919] whitespace-nowrap ${getChangeColorClass(totals.totalPnl)}`}
                     >
                       {formatIndianSigned(totals.totalPnl)}
                     </td>
                     <td
-                      className={`py-3.5 px-2.5 lg:px-3 text-right text-[11.5px] whitespace-nowrap ${getChangeColorClass(totals.totalPnlPct)}`}
+                      className={`py-3.5 px-2 xl:px-2.5 text-right text-[11.5px] whitespace-nowrap ${getChangeColorClass(totals.totalPnlPct)}`}
                     >
                       {totals.totalPnlPct >= 0 ? '+' : ''}
                       {totals.totalPnlPct.toFixed(2)}%
                     </td>
                     <td
-                      className={`py-3.5 px-2.5 lg:px-3 text-right text-[11.5px] whitespace-nowrap ${getChangeColorClass(totals.dayPnl)}`}
+                      className={`py-3.5 px-2 xl:px-2.5 text-right text-[11.5px] whitespace-nowrap ${getChangeColorClass(totals.dayPnl)}`}
                     >
                       <span>{formatIndianSigned(totals.dayPnl)}</span>{' '}
                       <span>({totals.dayPnlPct.toFixed(2)}%)</span>
                     </td>
-                    <td className="py-3.5 px-1 w-8" />
+                    <td className="py-3.5 px-0.5 w-7" />
                   </tr>
                 </tfoot>
               </table>
