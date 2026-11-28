@@ -273,7 +273,7 @@ export function TopBar({
     >
       <header
         data-testid="kite-header"
-        className="h-[50px] w-full xl:w-[calc(100%-48px)] max-w-[1360px] min-[1600px]:max-w-[1440px] mx-auto flex items-center justify-between"
+        className="h-[50px] w-full xl:w-[calc(100%-48px)] max-w-[1540px] mx-auto flex items-center justify-between"
       >
         {/* Left Zone: Indices aligned over MarketWatch rail */}
         <div
@@ -284,11 +284,11 @@ export function TopBar({
             data-testid="index-nifty"
             className="flex items-baseline gap-1 whitespace-nowrap shrink-0"
           >
-            <span className="text-[11px] font-medium text-[#444444] dark:text-[#E0E0E0] tracking-[-0.01em]">
+            <span className="text-[11px] font-semibold text-[#444444] dark:text-[#E0E0E0] tracking-[-0.01em]">
               NIFTY 50
             </span>
             <span
-              className={`font-mono-num text-[11px] font-medium ${getChangeColorClass(niftyQuote?.change ?? 0)}`}
+              className={`font-mono-num text-[11px] font-semibold ${getChangeColorClass(niftyQuote?.change ?? 0)}`}
             >
               {niftyQuote ? niftyQuote.ltp.toFixed(2) : '—'}
             </span>
@@ -303,11 +303,11 @@ export function TopBar({
             data-testid="index-sensex"
             className="flex items-baseline gap-1 whitespace-nowrap shrink-0"
           >
-            <span className="text-[11px] font-medium text-[#444444] dark:text-[#E0E0E0] tracking-[-0.01em]">
+            <span className="text-[11px] font-semibold text-[#444444] dark:text-[#E0E0E0] tracking-[-0.01em]">
               SENSEX
             </span>
             <span
-              className={`font-mono-num text-[11px] font-medium ${getChangeColorClass(sensexQuote?.change ?? 0)}`}
+              className={`font-mono-num text-[11px] font-semibold ${getChangeColorClass(sensexQuote?.change ?? 0)}`}
             >
               {sensexQuote ? sensexQuote.ltp.toFixed(2) : '—'}
             </span>
@@ -346,7 +346,7 @@ export function TopBar({
                 aria-expanded={openMenu === 'workspace'}
                 aria-haspopup="menu"
                 aria-label="Select workspace"
-                className="h-full min-w-[100px] min-[1400px]:min-w-[126px] min-[1760px]:min-w-[158px] px-2.5 xl:px-3 flex items-center justify-between gap-2 text-[12px] font-normal text-[#444444] dark:text-[#E0E0E0] hover:bg-[#FAFAFA] dark:hover:bg-[#252525] border-r border-[#EAEAEA] dark:border-[#303030] cursor-pointer transition-colors"
+                className="h-full min-w-[112px] min-[1400px]:min-w-[144px] min-[1600px]:min-w-[168px] px-2.5 xl:px-3 flex items-center justify-between gap-2 text-[12px] font-normal text-[#444444] dark:text-[#E0E0E0] hover:bg-[#FAFAFA] dark:hover:bg-[#252525] border-r border-[#EAEAEA] dark:border-[#303030] cursor-pointer transition-colors"
               >
                 <span className="truncate">{activeWorkspace?.name ?? 'Default'}</span>
                 <ChevronDown
@@ -509,8 +509,8 @@ export function TopBar({
                     }}
                     className={`h-full px-0.5 text-[12px] whitespace-nowrap shrink-0 flex items-center gap-1 transition-colors cursor-pointer ${
                       isActive
-                        ? 'text-[#FF5722] font-normal'
-                        : 'text-[#444444] dark:text-[#CCCCCC] hover:text-[#FF5722] dark:hover:text-[#FF5722] font-normal'
+                        ? 'text-[#FF5722] font-medium'
+                        : 'text-[#444444] dark:text-[#CCCCCC] hover:text-[#FF5722] dark:hover:text-[#FF5722] font-medium'
                     }`}
                   >
                     <span>{item.label}</span>
@@ -793,7 +793,7 @@ export function TopBar({
                   >
                     {initials}
                   </span>
-                  <span className="font-mono-num text-[12px] font-normal text-[#555555] dark:text-[#E0E0E0] group-hover:text-[#FF5722] transition-colors">
+                  <span className="font-mono-num text-[12px] font-medium text-[#444444] dark:text-[#E0E0E0] group-hover:text-[#FF5722] transition-colors">
                     {user.userId}
                   </span>
                 </button>

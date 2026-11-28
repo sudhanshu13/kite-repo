@@ -467,8 +467,8 @@ export function HoldingsView({
                 onClick={() => setActiveTab(tab.id)}
                 className={`relative py-3 text-[12.5px] transition-colors cursor-pointer whitespace-nowrap ${
                   isActive
-                    ? 'text-[#FF5722] font-normal'
-                    : 'text-[#444444] dark:text-[#A0A0A0] hover:text-[#FF5722]'
+                    ? 'text-[#FF5722] font-medium'
+                    : 'text-[#444444] dark:text-[#A0A0A0] hover:text-[#FF5722] font-medium'
                 }`}
               >
                 <span>{tab.label}</span>
@@ -489,7 +489,7 @@ export function HoldingsView({
         {/* Toolbar Row: Holdings (N) + Filter Select | Search + Family + Analytics + Download */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3.5">
-            <h1 className="text-[18px] font-normal text-[#444444] dark:text-[#E0E0E0] tracking-[-0.01em]">
+            <h1 className="text-[18px] font-medium text-[#444444] dark:text-[#E0E0E0] tracking-[-0.01em]">
               Holdings ({filteredRows.length})
             </h1>
 
@@ -564,16 +564,16 @@ export function HoldingsView({
           <div>
             <div className="text-[12px] text-[#9B9B9B]">Total investment</div>
             <div className="mt-1 tabular-nums text-[#444444] dark:text-[#E0E0E0] leading-tight tracking-[-0.01em]">
-              <span className="text-[20px] font-medium">{invParts.whole}</span>
-              <span className="text-[12px] font-medium">{invParts.decimals}</span>
+              <span className="text-[21px] font-semibold">{invParts.whole}</span>
+              <span className="text-[12px] font-semibold">{invParts.decimals}</span>
             </div>
           </div>
 
           <div>
             <div className="text-[12px] text-[#9B9B9B]">Current value</div>
             <div className="mt-1 tabular-nums text-[#444444] dark:text-[#E0E0E0] leading-tight tracking-[-0.01em]">
-              <span className="text-[20px] font-medium">{curParts.whole}</span>
-              <span className="text-[12px] font-medium">{curParts.decimals}</span>
+              <span className="text-[21px] font-semibold">{curParts.whole}</span>
+              <span className="text-[12px] font-semibold">{curParts.decimals}</span>
             </div>
           </div>
 
@@ -581,11 +581,11 @@ export function HoldingsView({
             <div className="text-[12px] text-[#9B9B9B]">Day&apos;s P&amp;L</div>
             <div className="mt-1 flex items-baseline flex-wrap gap-1.5 tabular-nums leading-tight tracking-[-0.01em]">
               <span className={getWorkspaceChangeColorClass(totals.dayPnl)}>
-                <span className="text-[20px] font-medium">{dayParts.whole}</span>
-                <span className="text-[12px] font-medium">{dayParts.decimals}</span>
+                <span className="text-[21px] font-semibold">{dayParts.whole}</span>
+                <span className="text-[12px] font-semibold">{dayParts.decimals}</span>
               </span>
               <span
-                className={`text-[10.5px] font-medium px-1.5 py-[2px] rounded-[2px] ${
+                className={`text-[10.5px] font-semibold px-1.5 py-[2px] rounded-[2px] ${
                   totals.dayPnl >= 0
                     ? 'bg-[#ECF7ED] text-[#4CAF50] dark:bg-[#193320] dark:text-[#4ADE80]'
                     : 'bg-[#FFF0EC] text-[#FF5722] dark:bg-[#3A1E16] dark:text-[#FF7043]'
@@ -601,11 +601,11 @@ export function HoldingsView({
             <div className="text-[12px] text-[#9B9B9B]">Total P&amp;L</div>
             <div className="mt-1 flex items-baseline flex-wrap gap-1.5 tabular-nums leading-tight tracking-[-0.01em]">
               <span className={getWorkspaceChangeColorClass(totals.totalPnl)}>
-                <span className="text-[20px] font-medium">{pnlParts.whole}</span>
-                <span className="text-[12px] font-medium">{pnlParts.decimals}</span>
+                <span className="text-[21px] font-semibold">{pnlParts.whole}</span>
+                <span className="text-[12px] font-semibold">{pnlParts.decimals}</span>
               </span>
               <span
-                className={`text-[10.5px] font-medium px-1.5 py-[2px] rounded-[2px] ${
+                className={`text-[10.5px] font-semibold px-1.5 py-[2px] rounded-[2px] ${
                   totals.totalPnl >= 0
                     ? 'bg-[#ECF7ED] text-[#4CAF50] dark:bg-[#193320] dark:text-[#4ADE80]'
                     : 'bg-[#FFF0EC] text-[#FF5722] dark:bg-[#3A1E16] dark:text-[#FF7043]'
@@ -795,7 +795,7 @@ export function HoldingsView({
 
                 {/* Bold Summary Total Footer Row */}
                 <tfoot>
-                  <tr className="border-t border-[#EEEEEE] dark:border-[#282828] font-medium text-[13px] tabular-nums">
+                  <tr className="border-t border-[#EEEEEE] dark:border-[#282828] font-semibold text-[13px] tabular-nums">
                     <td colSpan={3} className="py-3.5 px-2 xl:px-2.5" />
                     <td className="py-3.5 px-2 xl:px-2.5 text-right text-[#444444] dark:text-[#E0E0E0]">
                       Total
@@ -851,7 +851,7 @@ export function HoldingsView({
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="text-[14px] font-normal tabular-nums text-[#444444] dark:text-[#E0E0E0]">
+                <div className="text-[14px] font-medium tabular-nums text-[#444444] dark:text-[#E0E0E0]">
                   {barHeadlineValue < 0 ? '-' : ''}₹
                   {Math.abs(barHeadlineValue).toLocaleString('en-IN', {
                     minimumFractionDigits: 2,

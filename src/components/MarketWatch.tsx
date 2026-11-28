@@ -909,7 +909,7 @@ export function MarketWatch({
                     aria-expanded={!isCollapsed}
                     className="flex items-center gap-1.5 text-left min-w-0 cursor-pointer"
                   >
-                    <span className="text-[12px] font-medium text-[#444444] dark:text-[#E8E8E8] truncate">
+                    <span className="text-[12px] font-semibold text-[#444444] dark:text-[#E8E8E8] truncate">
                       {group.name}
                     </span>
                     <span className="text-[12px] font-normal text-[#9B9B9B] dark:text-[#9A9A9A] tabular-nums shrink-0">
@@ -1154,10 +1154,10 @@ export function MarketWatch({
                               <span className="text-[11.5px] font-normal text-[#9B9B9B] dark:text-[#8C8C8C] hidden sm:inline">
                                 {absChangeText}
                               </span>
-                              <span className="text-[11.5px] font-normal text-[#444444] dark:text-[#CFCFCF]">
+                              <span className="text-[11.5px] font-medium text-[#444444] dark:text-[#CFCFCF]">
                                 {pctText}
                               </span>
-                              <span className={`flex items-center gap-1 text-[12.5px] font-normal min-w-[64px] justify-end ${changeColor}`}>
+                              <span className={`flex items-center gap-1 text-[12.5px] font-medium min-w-[64px] justify-end ${changeColor}`}>
                                 {q.change >= 0 ? (
                                   <ChevronUp className="w-3 h-3 stroke-[1.75] shrink-0" />
                                 ) : (
