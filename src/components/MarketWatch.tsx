@@ -227,7 +227,6 @@ export function MarketWatch({
   const [searchFocused, setSearchFocused] = useState(false);
   const [isSearchingRemote, setIsSearchingRemote] = useState(false);
   const [expandedDepthToken, setExpandedDepthToken] = useState<number | null>(null);
-  const [flashMap, setFlashMap] = useState<Record<number, 'up' | 'down'>>({});
   const [savedGroupsByWl, setSavedGroupsByWl] = useState<Record<string, WatchlistGroup[]>>(
     () => loadSavedGroups(),
   );
@@ -246,7 +245,6 @@ export function MarketWatch({
   const [sortMode, setSortMode] = useState<SortMode>('default');
   const [showTechnicalsTag, setShowTechnicalsTag] = useState(false);
 
-  const prevLtpRef = useRef<Record<number, number>>({});
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
@@ -288,25 +286,6 @@ export function MarketWatch({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
-
-  // Detect tick price changes for subtle Kite-style flash highlight
-  useEffect(() => {
-    const nextFlash: Record<number, 'up' | 'down'> = {};
-    for (const token of activeTokens) {
-      const q = quotes[token];
-      if (!q) continue;
-      const prev = prevLtpRef.current[token];
-      if (prev !== undefined && q.ltp !== prev) {
-        nextFlash[token] = q.ltp > prev ? 'up' : 'down';
-      }
-      prevLtpRef.current[token] = q.ltp;
-    }
-    if (Object.keys(nextFlash).length > 0) {
-      setFlashMap(nextFlash);
-      const timer = setTimeout(() => setFlashMap({}), 450);
-      return () => clearTimeout(timer);
-    }
-  }, [quotes, activeTokens]);
 
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
@@ -1097,7 +1076,6 @@ export function MarketWatch({
 
                       const isSelected = selectedToken === token;
                       const isDepthOpen = expandedDepthToken === token;
-                      const flash = flashMap[token];
                       const signal = signals[token] ?? 'Neutral';
                       const changeColor = getChangeColorClass(q.change);
                       const holdingQty = holdingQtyByToken.get(token) ?? 0;
@@ -1114,12 +1092,6 @@ export function MarketWatch({
                         <div
                           key={token}
                           className={`group relative transition-colors ${
-                            flash === 'up'
-                              ? 'tick-flash-up'
-                              : flash === 'down'
-                                ? 'tick-flash-down'
-                                : ''
-                          } ${
                             isSelected
                               ? 'bg-[#FAFAFA] dark:bg-[#222222]'
                               : 'hover:bg-[#FAFAFA] dark:hover:bg-[#1E1E1E]'

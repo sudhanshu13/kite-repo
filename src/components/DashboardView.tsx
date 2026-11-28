@@ -15,7 +15,7 @@ import type {
 import {
   formatINR,
   formatPrice,
-  getChangeColorClass,
+  getWorkspaceChangeColorClass,
 } from '../utils/format.ts';
 import { StockScreenerView } from './StockScreenerView.tsx';
 import type { NavTab } from './TopBar.tsx';
@@ -296,7 +296,7 @@ export function DashboardView({
                       <div className="flex flex-wrap items-start gap-8">
                         <div className="shrink-0">
                           <div
-                            className={`text-[32px] leading-[1.15] font-light tabular-nums whitespace-nowrap tracking-tight ${getChangeColorClass(
+                            className={`text-[32px] leading-[1.15] font-light tabular-nums whitespace-nowrap tracking-tight ${getWorkspaceChangeColorClass(
                               holdingsSummary.totalPnl,
                             )}`}
                           >
@@ -304,7 +304,7 @@ export function DashboardView({
                           </div>
                           <div className="flex items-center gap-2 mt-1.5">
                             <span
-                              className={`text-[12px] tabular-nums ${getChangeColorClass(
+                              className={`text-[12px] tabular-nums ${getWorkspaceChangeColorClass(
                                 holdingsSummary.totalPnlPct,
                               )}`}
                             >
@@ -331,7 +331,7 @@ export function DashboardView({
                           <div className="flex items-center justify-between gap-6">
                             <span className="text-[#9B9B9B] whitespace-nowrap">Day&apos;s P&amp;L</span>
                             <span
-                              className={`tabular-nums whitespace-nowrap ${getChangeColorClass(holdingsSummary.dayPnl)}`}
+                              className={`tabular-nums whitespace-nowrap ${getWorkspaceChangeColorClass(holdingsSummary.dayPnl)}`}
                             >
                               {formatINR(holdingsSummary.dayPnl, true)}
                             </span>
@@ -463,7 +463,7 @@ export function DashboardView({
                                   </td>
                                   <td
                                     className={`py-2 px-2 text-right tabular-nums ${
-                                      position.quantity > 0 ? 'text-[#4184F3]' : 'text-[#DF514C]'
+                                      position.quantity > 0 ? 'text-[#4184F3]' : 'text-[#FF5722]'
                                     }`}
                                   >
                                     {position.quantity}
@@ -479,7 +479,7 @@ export function DashboardView({
                                     {formatPrice(metrics.ltp)}
                                   </td>
                                   <td
-                                    className={`py-2 px-2 text-right tabular-nums font-medium ${getChangeColorClass(
+                                    className={`py-2 px-2 text-right tabular-nums font-medium ${getWorkspaceChangeColorClass(
                                       metrics.mtmPnl,
                                     )}`}
                                   >

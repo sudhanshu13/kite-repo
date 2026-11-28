@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { computePositionMetrics } from '../../shared/portfolioMath.ts';
 import type { MarketQuote, OrderSide, Position } from '../../shared/types.ts';
-import { formatINR, formatPrice, getChangeColorClass } from '../utils/format.ts';
+import { formatINR, formatPrice, getWorkspaceChangeColorClass } from '../utils/format.ts';
 
 interface PositionsViewProps {
   positions: Position[];
@@ -210,13 +210,13 @@ export function PositionsView({
           </div>
           <div>
             <span className="text-[#9B9B9B] mr-1.5">Realised:</span>
-            <span className={`font-semibold ${getChangeColorClass(summary.realized)}`}>
+            <span className={`font-semibold ${getWorkspaceChangeColorClass(summary.realized)}`}>
               {formatINR(summary.realized, true)}
             </span>
           </div>
           <div>
             <span className="text-[#9B9B9B] mr-1.5">Total M2M:</span>
-            <span className={`font-semibold text-sm ${getChangeColorClass(summary.totalPnl)}`}>
+            <span className={`font-semibold text-sm ${getWorkspaceChangeColorClass(summary.totalPnl)}`}>
               {formatINR(summary.totalPnl, true)}
             </span>
           </div>
@@ -318,13 +318,13 @@ export function PositionsView({
                     </td>
 
                     <td
-                      className={`py-3.5 px-3 text-right tabular-nums bg-[#FAFAFA] dark:bg-[#191919] ${getChangeColorClass(metrics.mtmPnl)}`}
+                      className={`py-3.5 px-3 text-right tabular-nums bg-[#FAFAFA] dark:bg-[#191919] ${getWorkspaceChangeColorClass(metrics.mtmPnl)}`}
                     >
                       {formatINR(metrics.mtmPnl, true)}
                     </td>
 
                     <td className="py-3.5 px-3 pr-9 text-right tabular-nums text-[12px] relative">
-                      <span className={getChangeColorClass(effectiveChg)}>
+                      <span className={getWorkspaceChangeColorClass(effectiveChg)}>
                         {effectiveChg >= 0 ? '+' : ''}
                         {effectiveChg.toFixed(2)}%
                       </span>
@@ -380,7 +380,7 @@ export function PositionsView({
                   Total
                 </td>
                 <td
-                  className={`py-3.5 px-3 text-right bg-[#FAFAFA] dark:bg-[#191919] ${getChangeColorClass(summary.totalPnl)}`}
+                  className={`py-3.5 px-3 text-right bg-[#FAFAFA] dark:bg-[#191919] ${getWorkspaceChangeColorClass(summary.totalPnl)}`}
                 >
                   {formatINR(summary.totalPnl, true)}
                 </td>
@@ -486,7 +486,7 @@ export function PositionsView({
             type="button"
             role="menuitem"
             onClick={() => handleDelete(activeMenuRow.pos.id)}
-            className="w-full px-3 py-1.5 flex items-center gap-2 text-[#DF514C] dark:text-[#F87171] hover:bg-[#FEF2F2] dark:hover:bg-[#2A1B1B] cursor-pointer"
+            className="w-full px-3 py-1.5 flex items-center gap-2 text-[#FF5722] dark:text-[#F87171] hover:bg-[#FEF2F2] dark:hover:bg-[#2A1B1B] cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>Delete</span>
@@ -556,7 +556,7 @@ export function PositionsView({
               </div>
 
               {editError && (
-                <p className="text-xs text-[#DF514C] dark:text-[#F87171]">{editError}</p>
+                <p className="text-xs text-[#FF5722] dark:text-[#F87171]">{editError}</p>
               )}
 
               <div className="flex items-center justify-end gap-2 pt-1">

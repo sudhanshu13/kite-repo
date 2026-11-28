@@ -273,7 +273,7 @@ export function TopBar({
     >
       <header
         data-testid="kite-header"
-        className="h-[50px] w-full max-w-[1360px] min-[1560px]:max-w-[1440px] min-[1760px]:max-w-[1560px] mx-auto flex items-center justify-between"
+        className="h-[50px] w-full xl:w-[calc(100%-48px)] max-w-[1360px] min-[1600px]:max-w-[1440px] mx-auto flex items-center justify-between"
       >
         {/* Left Zone: Indices aligned over MarketWatch rail */}
         <div
@@ -320,8 +320,8 @@ export function TopBar({
         </div>
 
         {/* Right Zone: Kite Logo + Joined Workspace/Terminal Selector on Left, Exact Kite Menu + Cart + Bell + Profile on Right */}
-        <div className="flex-1 flex items-center justify-between gap-2.5 xl:gap-3 px-3.5 xl:px-5 min-[1760px]:px-7 min-w-0 h-full">
-          <div className="flex items-center gap-3 xl:gap-3.5 min-[1760px]:gap-5 min-w-0 shrink-0">
+        <div className="flex-1 flex items-center justify-between gap-3 px-4 xl:px-7 min-w-0 h-full">
+          <div className="flex items-center gap-3.5 xl:gap-4 min-[1760px]:gap-5 min-w-0 shrink-0">
             <button
               type="button"
               onClick={() => {
@@ -488,13 +488,13 @@ export function TopBar({
           </div>
 
           {/* Right-Aligned Kite Menu Items + Cart + Bell + User Avatar/ID */}
-          <div className="flex items-center gap-3 xl:gap-4 min-[1560px]:gap-5 min-[1760px]:gap-6 ml-auto min-w-0 h-full">
+          <div className="flex items-center gap-5 xl:gap-6 min-[1400px]:gap-7 ml-auto min-w-0 h-full">
             <nav
               aria-label="Primary sections"
               className={`hidden lg:flex items-center h-full ${
                 visibleNavItems.length > 6
-                  ? 'gap-2.5 xl:gap-3 min-[1400px]:gap-4 min-[1760px]:gap-6'
-                  : 'gap-3 xl:gap-4 min-[1400px]:gap-5 min-[1760px]:gap-7'
+                  ? 'gap-3.5 xl:gap-5 min-[1400px]:gap-6 min-[1760px]:gap-7'
+                  : 'gap-4 xl:gap-6 min-[1400px]:gap-8 min-[1760px]:gap-9'
               }`}
             >
               {visibleNavItems.map((item) => {
@@ -520,7 +520,7 @@ export function TopBar({
             </nav>
 
             {/* Kite Utility Icons: Cart + Notifications Bell + User Avatar/ID */}
-            <div className="flex items-center gap-2 xl:gap-2.5 min-[1760px]:gap-4 shrink-0">
+            <div className="flex items-center gap-3 xl:gap-3.5 min-[1400px]:gap-4 shrink-0">
               {/* Cart (Basket Orders) */}
               <div className="relative">
                 <button

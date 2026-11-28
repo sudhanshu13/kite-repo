@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   Activity,
   ChevronDown,
-  CircleDot,
   Download,
   MoreVertical,
   Pencil,
@@ -15,7 +14,15 @@ import {
 } from 'lucide-react';
 import { computeHoldingMetrics, computeHoldingsTotals } from '../../shared/portfolioMath.ts';
 import type { Holding, MarketQuote, OrderSide } from '../../shared/types.ts';
-import { formatPrice, getChangeColorClass } from '../utils/format.ts';
+import { formatPrice, getWorkspaceChangeColorClass } from '../utils/format.ts';
+
+function KiteConsoleAnalyticsIcon({ className = 'w-3 h-3' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" className={className} aria-hidden="true">
+      <circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="3.4" />
+    </svg>
+  );
+}
 
 type HoldingTab = 'all' | 'equity' | 'mutual_funds';
 type BarMode = 'current' | 'invested' | 'pnl';
@@ -443,11 +450,11 @@ export function HoldingsView({
   return (
     <div className="w-full">
       {/* Top Sub-Tab Bar: All | Equity | Mutual funds */}
-      <div className="px-5 lg:px-6 xl:px-7 border-b border-[#EEEEEE] dark:border-[#282828]">
+      <div className="px-5 lg:px-7 border-b border-[#EEEEEE] dark:border-[#282828]">
         <div
           role="tablist"
           aria-label="Holdings categories"
-          className="flex items-center gap-7"
+          className="flex items-center gap-8"
         >
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
@@ -478,7 +485,7 @@ export function HoldingsView({
       </div>
 
       {/* Main Holdings Content */}
-      <div className="px-5 py-5 lg:px-6 xl:px-7 lg:py-6 space-y-5">
+      <div className="px-5 py-5 lg:px-7 lg:py-6 space-y-5">
         {/* Toolbar Row: Holdings (N) + Filter Select | Search + Family + Analytics + Download */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3.5">
@@ -537,7 +544,7 @@ export function HoldingsView({
               onClick={() => setAnalyticsOpen(true)}
               className="inline-flex items-center gap-1.5 text-[#4184F3] hover:text-[#FF5722] active:text-[#FF5722] transition-colors cursor-pointer"
             >
-              <CircleDot className="w-3.5 h-3.5" />
+              <KiteConsoleAnalyticsIcon className="w-3 h-3" />
               <span>Analytics</span>
             </button>
 
@@ -573,7 +580,7 @@ export function HoldingsView({
           <div>
             <div className="text-[12px] text-[#9B9B9B]">Day&apos;s P&amp;L</div>
             <div className="mt-1 flex items-baseline flex-wrap gap-1.5 tabular-nums leading-tight tracking-[-0.01em]">
-              <span className={getChangeColorClass(totals.dayPnl)}>
+              <span className={getWorkspaceChangeColorClass(totals.dayPnl)}>
                 <span className="text-[20px] font-medium">{dayParts.whole}</span>
                 <span className="text-[12px] font-medium">{dayParts.decimals}</span>
               </span>
@@ -581,7 +588,7 @@ export function HoldingsView({
                 className={`text-[10.5px] font-medium px-1.5 py-[2px] rounded-[2px] ${
                   totals.dayPnl >= 0
                     ? 'bg-[#ECF7ED] text-[#4CAF50] dark:bg-[#193320] dark:text-[#4ADE80]'
-                    : 'bg-[#FCECEB] text-[#DF514C] dark:bg-[#351B1B] dark:text-[#F87171]'
+                    : 'bg-[#FFF0EC] text-[#FF5722] dark:bg-[#3A1E16] dark:text-[#FF7043]'
                 }`}
               >
                 {totals.dayPnlPct >= 0 ? '+' : ''}
@@ -593,7 +600,7 @@ export function HoldingsView({
           <div>
             <div className="text-[12px] text-[#9B9B9B]">Total P&amp;L</div>
             <div className="mt-1 flex items-baseline flex-wrap gap-1.5 tabular-nums leading-tight tracking-[-0.01em]">
-              <span className={getChangeColorClass(totals.totalPnl)}>
+              <span className={getWorkspaceChangeColorClass(totals.totalPnl)}>
                 <span className="text-[20px] font-medium">{pnlParts.whole}</span>
                 <span className="text-[12px] font-medium">{pnlParts.decimals}</span>
               </span>
@@ -601,7 +608,7 @@ export function HoldingsView({
                 className={`text-[10.5px] font-medium px-1.5 py-[2px] rounded-[2px] ${
                   totals.totalPnl >= 0
                     ? 'bg-[#ECF7ED] text-[#4CAF50] dark:bg-[#193320] dark:text-[#4ADE80]'
-                    : 'bg-[#FCECEB] text-[#DF514C] dark:bg-[#351B1B] dark:text-[#F87171]'
+                    : 'bg-[#FFF0EC] text-[#FF5722] dark:bg-[#3A1E16] dark:text-[#FF7043]'
                 }`}
               >
                 {totals.totalPnlPct >= 0 ? '+' : ''}
@@ -723,20 +730,20 @@ export function HoldingsView({
                         </td>
 
                         <td
-                          className={`py-3.5 px-2 xl:px-2.5 text-right tabular-nums bg-[#FAFAFA] dark:bg-[#191919] whitespace-nowrap ${getChangeColorClass(row.pnl)}`}
+                          className={`py-3.5 px-2 xl:px-2.5 text-right tabular-nums bg-[#FAFAFA] dark:bg-[#191919] whitespace-nowrap ${getWorkspaceChangeColorClass(row.pnl)}`}
                         >
                           {formatIndianSigned(row.pnl)}
                         </td>
 
                         <td
-                          className={`py-3.5 px-2 xl:px-2.5 text-right tabular-nums text-[11.5px] whitespace-nowrap ${getChangeColorClass(row.pnlPercent)}`}
+                          className={`py-3.5 px-2 xl:px-2.5 text-right tabular-nums text-[11.5px] whitespace-nowrap ${getWorkspaceChangeColorClass(row.pnlPercent)}`}
                         >
                           {row.pnlPercent >= 0 ? '+' : ''}
                           {row.pnlPercent.toFixed(2)}%
                         </td>
 
                         <td className="py-3.5 px-2 xl:px-2.5 text-right tabular-nums text-[11.5px] whitespace-nowrap">
-                          <span className={getChangeColorClass(row.dayChangePercent)}>
+                          <span className={getWorkspaceChangeColorClass(row.dayChangePercent)}>
                             {row.dayChangePercent >= 0 ? '+' : ''}
                             {row.dayChangePercent.toFixed(2)}%
                           </span>
@@ -800,21 +807,23 @@ export function HoldingsView({
                       {formatPrice(totals.current)}
                     </td>
                     <td
-                      className={`py-3.5 px-2 xl:px-2.5 text-right bg-[#FAFAFA] dark:bg-[#191919] whitespace-nowrap ${getChangeColorClass(totals.totalPnl)}`}
+                      className={`py-3.5 px-2 xl:px-2.5 text-right bg-[#FAFAFA] dark:bg-[#191919] whitespace-nowrap ${getWorkspaceChangeColorClass(totals.totalPnl)}`}
                     >
                       {formatIndianSigned(totals.totalPnl)}
                     </td>
                     <td
-                      className={`py-3.5 px-2 xl:px-2.5 text-right text-[11.5px] whitespace-nowrap ${getChangeColorClass(totals.totalPnlPct)}`}
+                      className={`py-3.5 px-2 xl:px-2.5 text-right text-[11.5px] whitespace-nowrap ${getWorkspaceChangeColorClass(totals.totalPnlPct)}`}
                     >
                       {totals.totalPnlPct >= 0 ? '+' : ''}
                       {totals.totalPnlPct.toFixed(2)}%
                     </td>
-                    <td
-                      className={`py-3.5 px-2 xl:px-2.5 text-right text-[11.5px] whitespace-nowrap ${getChangeColorClass(totals.dayPnl)}`}
-                    >
-                      <span>{formatIndianSigned(totals.dayPnl)}</span>{' '}
-                      <span>({totals.dayPnlPct.toFixed(2)}%)</span>
+                    <td className="py-3.5 px-2 xl:px-2.5 text-right text-[11.5px] whitespace-nowrap">
+                      <span className="text-[#444444] dark:text-[#E0E0E0]">
+                        {formatIndianSigned(totals.dayPnl)}
+                      </span>{' '}
+                      <span className={getWorkspaceChangeColorClass(totals.dayPnl)}>
+                        ({totals.dayPnlPct.toFixed(2)}%)
+                      </span>
                     </td>
                     <td className="py-3.5 px-0.5 w-7" />
                   </tr>
@@ -972,7 +981,7 @@ export function HoldingsView({
             type="button"
             role="menuitem"
             onClick={() => handleDeleteRow(activeMenuRow)}
-            className="w-full px-3 py-1.5 flex items-center gap-2 text-[#DF514C] dark:text-[#F87171] hover:bg-[#FEF2F2] dark:hover:bg-[#2A1B1B] cursor-pointer"
+            className="w-full px-3 py-1.5 flex items-center gap-2 text-[#FF5722] dark:text-[#F87171] hover:bg-[#FEF2F2] dark:hover:bg-[#2A1B1B] cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>Delete</span>
@@ -1043,7 +1052,7 @@ export function HoldingsView({
               </div>
 
               {editError && (
-                <p className="text-xs text-[#DF514C] dark:text-[#F87171]">{editError}</p>
+                <p className="text-xs text-[#FF5722] dark:text-[#F87171]">{editError}</p>
               )}
 
               <div className="flex items-center justify-end gap-2 pt-1">

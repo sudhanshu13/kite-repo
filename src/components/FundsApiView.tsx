@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { KeyRound, RefreshCw, ShieldAlert, Wifi } from 'lucide-react';
 import type { PortfolioState } from '../../shared/types.ts';
-import { formatINR, formatTime, getChangeColorClass } from '../utils/format.ts';
+import { formatINR, formatTime, getWorkspaceChangeColorClass } from '../utils/format.ts';
 
 interface FundsApiViewProps {
   portfolio: PortfolioState;
@@ -100,7 +100,7 @@ export function FundsApiView({
           <button
             type="button"
             onClick={onResetPortfolio}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-[#E0E0E0] dark:border-[#333333] text-[#666666] dark:text-[#A0A0A0] hover:border-[#DF514C] hover:text-[#DF514C] rounded transition-colors cursor-pointer self-start sm:self-auto"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-[#E0E0E0] dark:border-[#333333] text-[#666666] dark:text-[#A0A0A0] hover:border-[#FF5722] hover:text-[#FF5722] rounded transition-colors cursor-pointer self-start sm:self-auto"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Reset Paper Portfolio</span>
@@ -141,7 +141,7 @@ export function FundsApiView({
             <div className="py-2.5 flex justify-between">
               <span className="text-[#9B9B9B]">Realised P&amp;L</span>
               <span
-                className={`tabular-nums font-medium ${getChangeColorClass(portfolio.realizedPnl)}`}
+                className={`tabular-nums font-medium ${getWorkspaceChangeColorClass(portfolio.realizedPnl)}`}
               >
                 {formatINR(portfolio.realizedPnl, true)}
               </span>
@@ -255,7 +255,7 @@ export function FundsApiView({
               className={`text-xs font-medium ${
                 wsConnected
                   ? 'text-[#4CAF50] dark:text-[#4ADE80]'
-                  : 'text-[#DF514C] dark:text-[#F87171]'
+                  : 'text-[#FF5722] dark:text-[#F87171]'
               }`}
             >
               {wsConnected ? 'Live Stream Connected' : 'Disconnected'}
@@ -286,7 +286,7 @@ export function FundsApiView({
                 type="button"
                 disabled={busy}
                 onClick={handleDisconnectBridge}
-                className="px-4 py-2 text-xs font-medium border border-[#DF514C] text-[#DF514C] hover:bg-[#DF514C]/10 rounded cursor-pointer"
+                className="px-4 py-2 text-xs font-medium border border-[#FF5722] text-[#FF5722] hover:bg-[#FF5722]/10 rounded cursor-pointer"
               >
                 Disconnect Quote Bridge
               </button>
@@ -345,7 +345,7 @@ export function FundsApiView({
               className={`text-xs ${
                 bridgeMsg.type === 'ok'
                   ? 'text-[#4CAF50] dark:text-[#4ADE80]'
-                  : 'text-[#DF514C] dark:text-[#F87171]'
+                  : 'text-[#FF5722] dark:text-[#F87171]'
               }`}
             >
               {bridgeMsg.text}

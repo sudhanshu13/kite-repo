@@ -104,7 +104,7 @@ export function OrdersView({ orders, onCancelOrder }: OrdersViewProps) {
                         disabled={cancellingId === o.id}
                         onClick={() => handleCancel(o.id)}
                         aria-label={`Cancel order ${o.id} for ${o.symbol}`}
-                        className="inline-flex items-center gap-1 text-xs text-[#DF514C] hover:underline font-medium cursor-pointer disabled:opacity-50"
+                        className="inline-flex items-center gap-1 text-xs text-[#FF5722] hover:underline font-medium cursor-pointer disabled:opacity-50"
                       >
                         <XCircle className="w-3.5 h-3.5" />
                         <span>{cancellingId === o.id ? 'Cancelling...' : 'Cancel'}</span>

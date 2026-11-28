@@ -59,3 +59,9 @@ export function getChangeColorClass(value: number): string {
   if (value < 0) return 'text-[#DF514C] dark:text-[#F87171]';
   return 'text-[#666666] dark:text-[#8B909E]';
 }
+
+export function getWorkspaceChangeColorClass(value: number): string {
+  if (value > 0) return 'text-[#4CAF50] dark:text-[#4ADE80]';
+  if (value < 0) return 'text-[#FF5722] dark:text-[#FF7043]';
+  return 'text-[#666666] dark:text-[#8B909E]';
+}

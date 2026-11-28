@@ -44,32 +44,6 @@
   }
 }
 
-@keyframes flash-green {
-  0% {
-    background-color: rgba(76, 175, 80, 0.22);
-  }
-  100% {
-    background-color: transparent;
-  }
-}
-
-@keyframes flash-red {
-  0% {
-    background-color: rgba(223, 81, 76, 0.22);
-  }
-  100% {
-    background-color: transparent;
-  }
-}
-
-.tick-flash-up {
-  animation: flash-green 0.55s ease-out;
-}
-
-.tick-flash-down {
-  animation: flash-red 0.55s ease-out;
-}
-
 /* Clean subtle Kite-style scrollbars */
 ::-webkit-scrollbar {
   width: 5px;
